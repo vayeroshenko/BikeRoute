@@ -49,12 +49,16 @@ class CandidateRejection(DomainModel):
 
 class OutboundPlan(DomainModel):
     requested_departure: AwareDatetime
+    preferred_bike_minutes: float = Field(ge=0)
+    max_bike_minutes: float = Field(gt=0)
     options: tuple[OutboundOption, ...]
     rejections: tuple[CandidateRejection, ...] = ()
 
     @model_validator(mode="after")
     def validate_departure(self) -> OutboundPlan:
         _require_aware(self.requested_departure, "requested_departure")
+        if self.max_bike_minutes < self.preferred_bike_minutes:
+            raise ValueError("max_bike_minutes must be at least preferred_bike_minutes")
         return self
 
 

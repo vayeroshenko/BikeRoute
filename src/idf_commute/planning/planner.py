@@ -133,6 +133,8 @@ class OutboundPlanner:
         options.sort(key=lambda option: option.score.total_minutes)
         return OutboundPlan(
             requested_departure=request.depart_at,
+            preferred_bike_minutes=request.preferred_bike_minutes,
+            max_bike_minutes=request.max_bike_minutes,
             options=tuple(
                 deduplicate_outbound_options(
                     options,

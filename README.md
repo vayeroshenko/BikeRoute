@@ -53,11 +53,14 @@ for outbound planner behavior and current live findings.
 ```bash
 idf-commute plan outbound \
   --config config.yaml \
-  --depart-at 2026-07-30T08:00:00+02:00
+  --depart-at 2026-07-30T08:00:00+02:00 \
+  --max-bike-minutes 25
 ```
 
 The command never relaxes the configured hard bicycle limit. Rejected routes
-show their measured duration and reason.
+show their measured duration and reason. `--max-bike-minutes` changes the hard
+limit for one run without editing `config.yaml`; for a persistent change, set
+`bicycle.max_bike_minutes` in the ignored local configuration.
 
 ## Offline checks
 

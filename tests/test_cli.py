@@ -6,7 +6,12 @@ from zoneinfo import ZoneInfo
 import pytest
 from typer.testing import CliRunner
 
-from idf_commute.cli import _parse_departure, _resolve_candidate_stations, app
+from idf_commute.cli import (
+    _effective_bike_thresholds,
+    _parse_departure,
+    _resolve_candidate_stations,
+    app,
+)
 from idf_commute.config import CandidateStation
 from idf_commute.domain.models import Location, Station
 
@@ -39,6 +44,7 @@ def test_plan_outbound_help_is_available() -> None:
     result = runner.invoke(app, ["plan", "outbound", "--help"])
     assert result.exit_code == 0
     assert "--depart-at" in result.output
+    assert "--max-bike-minutes" in result.output
 
 
 def test_naive_departure_uses_configured_timezone() -> None:
@@ -80,3 +86,11 @@ async def test_candidate_resolution_prefers_required_line() -> None:
     )
     assert stations[0].id == "stop_area:rer"
     assert stations[0].name == "Bike station"
+
+
+def test_bike_limit_override_is_per_run_and_can_be_stricter_than_preference() -> None:
+    assert _effective_bike_thresholds(20, 25, None) == (20, 25)
+    assert _effective_bike_thresholds(20, 25, 22) == (20, 22)
+    assert _effective_bike_thresholds(20, 25, 18) == (18, 18)
+    with pytest.raises(ValueError, match="greater than zero"):
+        _effective_bike_thresholds(20, 25, 0)

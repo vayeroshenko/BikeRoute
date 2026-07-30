@@ -157,10 +157,19 @@ def probe_stop_monitoring(
     _probe_command("stop-monitoring", config, fixture_dir, dry_run)
 
 
-async def _run_outbound_plan(config_path: Path, depart_at_text: str) -> OutboundPlan:
+async def _run_outbound_plan(
+    config_path: Path,
+    depart_at_text: str,
+    max_bike_minutes: float | None,
+) -> OutboundPlan:
     config = load_config(config_path)
     settings = Settings()
     departure = _parse_departure(depart_at_text, config.timezone)
+    preferred_minutes, hard_minutes = _effective_bike_thresholds(
+        config.bicycle.preferred_bike_minutes,
+        config.bicycle.max_bike_minutes,
+        max_bike_minutes,
+    )
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
@@ -187,8 +196,8 @@ async def _run_outbound_plan(config_path: Path, depart_at_text: str) -> Outbound
                 work_transit_id=config.locations.work.navitia_coord,
                 candidate_stations=tuple(stations),
                 depart_at=departure,
-                preferred_bike_minutes=config.bicycle.preferred_bike_minutes,
-                max_bike_minutes=config.bicycle.max_bike_minutes,
+                preferred_bike_minutes=preferred_minutes,
+                max_bike_minutes=hard_minutes,
                 parking_buffer_minutes=config.bicycle.parking_buffer_minutes,
                 bike_profile=config.bicycle.profile,
                 bike_type=config.bicycle.bike_type,
@@ -244,7 +253,22 @@ def _parse_departure(value: str, timezone: str) -> datetime:
     return parsed.astimezone(zone)
 
 
+def _effective_bike_thresholds(
+    configured_preferred: float,
+    configured_maximum: float,
+    override_maximum: float | None,
+) -> tuple[float, float]:
+    maximum = configured_maximum if override_maximum is None else override_maximum
+    if maximum <= 0:
+        raise ValueError("--max-bike-minutes must be greater than zero")
+    return min(configured_preferred, maximum), maximum
+
+
 def _render_outbound_plan(plan: OutboundPlan) -> None:
+    console.print(
+        f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
+        f"hard maximum {plan.max_bike_minutes:g} min"
+    )
     table = Table("Rank", "Type", "Station", "Bike", "Arrival", "Score", "Alerts")
     for rank, option in enumerate(plan.options, start=1):
         bike = (
@@ -294,10 +318,14 @@ def plan_outbound(
         typer.Option(help="ISO 8601 departure, with an offset when possible."),
     ],
     config: ConfigPath = Path("config.yaml"),
+    max_bike_minutes: Annotated[
+        float | None,
+        typer.Option(help="Override bicycle hard limit for this run; config.yaml is unchanged."),
+    ] = None,
 ) -> None:
     """Plan bike-to-station plus transit options and an all-transit baseline."""
     try:
-        plan = asyncio.run(_run_outbound_plan(config, depart_at))
+        plan = asyncio.run(_run_outbound_plan(config, depart_at, max_bike_minutes))
     except (
         FileNotFoundError,
         ValueError,

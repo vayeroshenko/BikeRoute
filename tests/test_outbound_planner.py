@@ -109,6 +109,8 @@ async def test_explicit_station_join_thresholds_and_baseline() -> None:
     ).plan(planning_request())
 
     assert len(plan.options) == 3
+    assert plan.preferred_bike_minutes == 20
+    assert plan.max_bike_minutes == 25
     assert sum(option.kind is OutboundOptionKind.BIKE_TRANSIT for option in plan.options) == 2
     assert sum(option.kind is OutboundOptionKind.ALL_TRANSIT for option in plan.options) == 1
     assert [rejection.bike_duration_minutes for rejection in plan.rejections] == [60]
