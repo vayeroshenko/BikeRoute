@@ -138,6 +138,7 @@ class OutboundPlanner:
             requested_departure=request.depart_at,
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
+            candidate_station_count=len(request.candidate_stations),
             options=tuple(
                 select_diverse_outbound_options(
                     options,

@@ -22,6 +22,8 @@ bicycle:
   preferred_bike_minutes: 20
   max_bike_minutes: 25
   parking_buffer_minutes: 4
+  target_line_id: "line:IDFM:C01743"
+  target_line_label: "RER B"
 
 line_queries:
   - "RER B"

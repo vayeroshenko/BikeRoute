@@ -52,6 +52,8 @@ class BicycleConfig(BaseModel):
     preferred_bike_minutes: float = Field(default=20, ge=0)
     max_bike_minutes: float = Field(default=25, gt=0)
     parking_buffer_minutes: float = Field(default=4, ge=0)
+    target_line_id: str = "line:IDFM:C01743"
+    target_line_label: str = "RER B"
 
 
 class AppConfig(BaseModel):
@@ -59,7 +61,7 @@ class AppConfig(BaseModel):
 
     timezone: str = "Europe/Paris"
     locations: LocationsConfig
-    candidate_stations: list[CandidateStation]
+    candidate_stations: list[CandidateStation] = Field(default_factory=list)
     line_queries: list[str] = Field(default_factory=lambda: ["RER B", "4602", "21", "22"])
     bicycle: BicycleConfig = Field(default_factory=BicycleConfig)
     probe: ProbeConfig = Field(default_factory=ProbeConfig)

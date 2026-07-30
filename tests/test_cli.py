@@ -15,9 +15,10 @@ from idf_commute.cli import (
     _parse_departure,
     _render_outbound_plan,
     _resolve_candidate_stations,
+    _select_bike_stations,
     app,
 )
-from idf_commute.config import CandidateStation
+from idf_commute.config import AppConfig, CandidateStation
 from idf_commute.domain.models import (
     BikeRoute,
     Disruption,
@@ -63,6 +64,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--depart-at" in result.output
     assert "--max-bike-minutes" in result.output
     assert "--max-results" in result.output
+    assert "--bike-station" in result.output
 
 
 def test_naive_departure_uses_configured_timezone() -> None:
@@ -89,6 +91,25 @@ class FakePlaces:
         ]
 
 
+class FakeStationProvider(FakePlaces):
+    async def line_stations(self, line_id: str) -> list[Station]:
+        assert line_id == "line:IDFM:C01743"
+        return [
+            Station(
+                id="stop_area:near",
+                name="Bourg-la-Reine",
+                location=Location(latitude=48.78, longitude=2.31),
+                line_ids=(line_id,),
+            ),
+            Station(
+                id="stop_area:far",
+                name="Aéroport CDG",
+                location=Location(latitude=49.0, longitude=2.57),
+                line_ids=(line_id,),
+            ),
+        ]
+
+
 @pytest.mark.asyncio
 async def test_candidate_resolution_prefers_required_line() -> None:
     stations = await _resolve_candidate_stations(
@@ -104,6 +125,30 @@ async def test_candidate_resolution_prefers_required_line() -> None:
     )
     assert stations[0].id == "stop_area:rer"
     assert stations[0].name == "Bike station"
+
+
+@pytest.mark.asyncio
+async def test_best_station_search_prefilters_rer_b_by_bicycle_radius(
+    app_config: AppConfig,
+) -> None:
+    stations = await _select_bike_stations(
+        app_config,
+        FakeStationProvider(),
+        "best",
+        max_bike_minutes=30,
+    )
+    assert [station.id for station in stations] == ["stop_area:near"]
+
+
+@pytest.mark.asyncio
+async def test_explicit_station_accepts_normalized_name(app_config: AppConfig) -> None:
+    stations = await _select_bike_stations(
+        app_config,
+        FakeStationProvider(),
+        "Bourg La Reine",
+        max_bike_minutes=30,
+    )
+    assert [station.id for station in stations] == ["stop_area:near"]
 
 
 def test_bike_limit_override_is_per_run_and_can_be_stricter_than_preference() -> None:

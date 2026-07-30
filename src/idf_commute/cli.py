@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import html
+import math
 import re
+import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
@@ -14,6 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from idf_commute.config import (
+    AppConfig,
     CandidateStation,
     MissingAccessError,
     Settings,
@@ -45,7 +48,7 @@ from idf_commute.providers import (
     PrimClient,
 )
 from idf_commute.providers.prim_client import PrimError
-from idf_commute.providers.protocols import PlaceProvider
+from idf_commute.providers.protocols import PlaceProvider, StationProvider
 
 app = typer.Typer(
     name="idf-commute",
@@ -172,6 +175,7 @@ async def _run_outbound_plan(
     depart_at_text: str,
     max_bike_minutes: float | None,
     max_results: int,
+    bike_station: str | None,
 ) -> OutboundPlan:
     config = load_config(config_path)
     settings = Settings()
@@ -187,7 +191,12 @@ async def _run_outbound_plan(
         timeout_seconds=settings.timeout_seconds,
     ) as client:
         navitia = NavitiaAdapter(client, str(settings.navitia_base_url))
-        stations = await _resolve_candidate_stations(config.candidate_stations, navitia)
+        stations = await _select_bike_stations(
+            config,
+            navitia,
+            bike_station,
+            hard_minutes,
+        )
         planner = OutboundPlanner(
             bike_router=GeoveloAdapter(client, str(settings.geovelo_url)),
             transit_router=navitia,
@@ -252,6 +261,102 @@ async def _resolve_candidate_stations(
     return resolved
 
 
+async def _select_bike_stations(
+    config: AppConfig,
+    stations_provider: StationProvider,
+    selection: str | None,
+    max_bike_minutes: float,
+) -> list[Station]:
+    if selection is None:
+        if not config.candidate_stations:
+            raise ValueError(
+                "No configured candidate stations; use --bike-station best or a "
+                "RER B station name/ID"
+            )
+        return await _resolve_candidate_stations(
+            config.candidate_stations,
+            stations_provider,
+        )
+
+    line_id = config.bicycle.target_line_id
+    line_stations = await stations_provider.line_stations(line_id)
+    usable = [station for station in line_stations if station.location is not None]
+    if selection.casefold() == "best":
+        radius_km = (
+            config.bicycle.average_speed_kmh * max_bike_minutes / 60 * 1.5
+        )
+        nearby = [
+            station
+            for station in usable
+            if station.location is not None
+            and _distance_km(
+                config.locations.home.latitude,
+                config.locations.home.longitude,
+                station.location.latitude,
+                station.location.longitude,
+            )
+            <= radius_km
+        ]
+        if not nearby:
+            raise ValueError(
+                f"No {config.bicycle.target_line_label} stations found within the "
+                "automatic bicycle search radius"
+            )
+        return nearby
+
+    selected = _match_line_station(usable, selection)
+    if selected is None:
+        raise ValueError(
+            f"Could not find {config.bicycle.target_line_label} station {selection!r}; "
+            "use its station name, stop-area ID, or --bike-station best"
+        )
+    return [selected]
+
+
+def _match_line_station(stations: list[Station], selection: str) -> Station | None:
+    exact_id = next((station for station in stations if station.id == selection), None)
+    if exact_id is not None:
+        return exact_id
+    key = _station_key(selection)
+    exact_name = next(
+        (station for station in stations if _station_key(station.name) == key),
+        None,
+    )
+    if exact_name is not None:
+        return exact_name
+    partial = [station for station in stations if key in _station_key(station.name)]
+    return partial[0] if len(partial) == 1 else None
+
+
+def _station_key(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value.casefold())
+    return "".join(character for character in decomposed if character.isalnum())
+
+
+def _distance_km(
+    origin_latitude: float,
+    origin_longitude: float,
+    destination_latitude: float,
+    destination_longitude: float,
+) -> float:
+    lat1, lon1, lat2, lon2 = map(
+        math.radians,
+        (
+            origin_latitude,
+            origin_longitude,
+            destination_latitude,
+            destination_longitude,
+        ),
+    )
+    latitude_delta = lat2 - lat1
+    longitude_delta = lon2 - lon1
+    haversine = (
+        math.sin(latitude_delta / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(longitude_delta / 2) ** 2
+    )
+    return 2 * 6371.0088 * math.asin(math.sqrt(haversine))
+
+
 def _parse_departure(value: str, timezone: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value)
@@ -281,6 +386,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
         f"hard maximum {plan.max_bike_minutes:g} min"
     )
+    console.print(f"Bike stations evaluated: {plan.candidate_station_count}")
     table = Table(
         "Rank",
         "Type",
@@ -534,11 +640,26 @@ def plan_outbound(
             help="Maximum number of distinct ranked itineraries to display.",
         ),
     ] = 10,
+    bike_station: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Bike endpoint: RER B station name/stop-area ID, or 'best' to "
+                "evaluate nearby RER B stations. Omit to use config candidates."
+            )
+        ),
+    ] = None,
 ) -> None:
     """Plan bike-to-station plus transit options and an all-transit baseline."""
     try:
         plan = asyncio.run(
-            _run_outbound_plan(config, depart_at, max_bike_minutes, max_results)
+            _run_outbound_plan(
+                config,
+                depart_at,
+                max_bike_minutes,
+                max_results,
+                bike_station,
+            )
         )
     except (
         FileNotFoundError,

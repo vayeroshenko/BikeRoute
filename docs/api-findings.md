@@ -17,6 +17,7 @@ remains synthetic.
 | Navitia lines | `GET {navitia_base}/lines` | Same | `count=1000`, `start_page`; local exact matching | HTTP 200; 1,470 lines over two pages |
 | Navitia journeys | `GET {navitia_base}/journeys` | Same | exact station ID, coordinate destination, `data_freshness=realtime`, `direct_path=none` | HTTP 200; two journeys; mixed section-level realtime/base schedule |
 | Navitia bicycle parking | Same journeys path | Same | `first_section_mode[]=bike`, `last_section_mode[]=walking`, `park_mode=on_street`, `max_duration_to_pt=1320` | HTTP 200, but bike/park parameters ignored for tested route |
+| Navitia line stations | `GET {navitia_base}/lines/{line_id}/stop_areas` | Same | `count=100` | HTTP 200; RER B returned 47 stop areas with stable IDs and coordinates |
 | Bulk disruptions | `GET {disruptions_url}` | `apiKey` | response timestamps, affected lines/stops/segments | HTTP 200 observed; 998 disruptions; top-level `lastUpdatedDate`, `lines`, `disruptions` |
 | Geovelo | `POST /marketplace/computedroutes` | `apiKey`; `Accept: application/json`; JSON content type | query feature flags; waypoints and nested `bikeDetails` body | HTTP 200 with three rich alternatives |
 | Stop Monitoring | `GET {stop_monitoring_url}` | Same candidate | `MonitoringRef` | Optional; no stop ID configured, not called |

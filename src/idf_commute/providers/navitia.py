@@ -51,6 +51,15 @@ class NavitiaAdapter:
         )
         return normalize_navitia_stations(response.body)
 
+    async def line_stations(self, line_id: str) -> list[Station]:
+        response = await self._client.get_json(
+            f"{self._base_url}/lines/{line_id}/stop_areas",
+            params={"count": 100},
+            cache_key=f"prim:line-stations:{line_id}",
+            cache_ttl_seconds=7 * 24 * 60 * 60,
+        )
+        return normalize_navitia_stop_areas(response.body, line_id=line_id)
+
 
 def normalize_navitia_journeys(payload: Any) -> list[TransitJourney]:
     if not isinstance(payload, Mapping) or not isinstance(payload.get("journeys"), list):
@@ -108,6 +117,31 @@ def normalize_navitia_stations(payload: Any) -> list[Station]:
                     else None
                 ),
                 line_ids=tuple(line_ids),
+            )
+        )
+    return stations
+
+
+def normalize_navitia_stop_areas(payload: Any, *, line_id: str) -> list[Station]:
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("stop_areas"), list):
+        raise NavitiaSchemaError("Expected an object containing a stop_areas array")
+    stations: list[Station] = []
+    for raw_stop_area in payload["stop_areas"]:
+        if not isinstance(raw_stop_area, Mapping):
+            raise NavitiaSchemaError("Every stop area must be an object")
+        coord = _mapping(raw_stop_area.get("coord"))
+        latitude = _coordinate(coord.get("lat"))
+        longitude = _coordinate(coord.get("lon"))
+        stations.append(
+            Station(
+                id=_required_string(raw_stop_area.get("id"), "stop_area.id"),
+                name=_required_string(raw_stop_area.get("name"), "stop_area.name"),
+                location=(
+                    Location(latitude=latitude, longitude=longitude)
+                    if latitude is not None and longitude is not None
+                    else None
+                ),
+                line_ids=(line_id,),
             )
         )
     return stations

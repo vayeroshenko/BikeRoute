@@ -32,3 +32,11 @@ class DepartureProvider(Protocol):
 
 class PlaceProvider(Protocol):
     async def stations(self, query: str) -> list[Station]: ...
+
+
+class LineStationProvider(Protocol):
+    async def line_stations(self, line_id: str) -> list[Station]: ...
+
+
+class StationProvider(PlaceProvider, LineStationProvider, Protocol):
+    """Resolve stations by free-text query or by a stable line identifier."""

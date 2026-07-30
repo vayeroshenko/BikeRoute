@@ -8,12 +8,13 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
-from idf_commute.domain.models import Freshness, TransitRequest
+from idf_commute.domain.models import Freshness, Location, TransitRequest
 from idf_commute.providers.navitia import (
     NavitiaAdapter,
     NavitiaSchemaError,
     normalize_navitia_journeys,
     normalize_navitia_stations,
+    normalize_navitia_stop_areas,
 )
 from idf_commute.providers.prim_client import PrimClient
 
@@ -128,3 +129,49 @@ async def test_adapter_resolves_station_query() -> None:
             "https://prim.test/marketplace/v2/navitia",
         ).stations("Bourg-la-Reine")
     assert stations[0].id == "stop_area:IDFM:70033"
+
+
+def test_normalizes_line_stop_areas_with_coordinates() -> None:
+    stations = normalize_navitia_stop_areas(
+        {
+            "stop_areas": [
+                {
+                    "id": "stop_area:IDFM:70033",
+                    "name": "Bourg-la-Reine",
+                    "coord": {"lat": "48.7801", "lon": "2.3125"},
+                }
+            ]
+        },
+        line_id="line:IDFM:C01743",
+    )
+    assert stations[0].name == "Bourg-la-Reine"
+    assert stations[0].location == Location(latitude=48.7801, longitude=2.3125)
+    assert stations[0].line_ids == ("line:IDFM:C01743",)
+
+
+@pytest.mark.asyncio
+async def test_adapter_fetches_stations_for_line() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith(
+            "/lines/line:IDFM:C01743/stop_areas"
+        )
+        assert request.url.params["count"] == "100"
+        return httpx.Response(
+            200,
+            json={
+                "stop_areas": [
+                    {
+                        "id": "stop_area:IDFM:70033",
+                        "name": "Bourg-la-Reine",
+                        "coord": {"lat": "48.7801", "lon": "2.3125"},
+                    }
+                ]
+            },
+        )
+
+    async with PrimClient("secret", transport=httpx.MockTransport(handler)) as client:
+        stations = await NavitiaAdapter(
+            client,
+            "https://prim.test/marketplace/v2/navitia",
+        ).line_stations("line:IDFM:C01743")
+    assert [station.id for station in stations] == ["stop_area:IDFM:70033"]

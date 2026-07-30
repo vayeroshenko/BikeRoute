@@ -55,6 +55,7 @@ idf-commute plan outbound \
   --config config.yaml \
   --depart-at 2026-07-30T08:00:00+02:00 \
   --max-bike-minutes 25 \
+  --bike-station best \
   --max-results 10
 ```
 
@@ -74,6 +75,14 @@ disruption notices.
 Interchangeable services of the same transport type between the same two stops
 are grouped into one itinerary (for example, `Bus 4602 / 4621 / 4622`). The
 displayed times and score come from the fastest member of the group.
+
+Use `--bike-station best` to discover RER B stations, prefilter them to a
+generous bicycle radius, and let the full Geovelo + transit score select the
+best endpoint. Pass a station name or stop-area ID instead to evaluate exactly
+one endpoint, for example `--bike-station Bourg-la-Reine`. If the option is
+omitted, the planner retains the configured `candidate_stations` behavior.
+The automatic line is configured with `bicycle.target_line_id` and
+`bicycle.target_line_label`; both default to RER B.
 
 ## Offline checks
 

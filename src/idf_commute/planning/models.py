@@ -52,6 +52,7 @@ class OutboundPlan(DomainModel):
     requested_departure: AwareDatetime
     preferred_bike_minutes: float = Field(ge=0)
     max_bike_minutes: float = Field(gt=0)
+    candidate_station_count: int = Field(default=0, ge=0)
     options: tuple[OutboundOption, ...]
     rejections: tuple[CandidateRejection, ...] = ()
 
