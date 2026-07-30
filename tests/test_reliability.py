@@ -12,7 +12,12 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitLeg,
 )
-from idf_commute.planning.reliability import ReliabilityPolicy, assess_reliability
+from idf_commute.planning.reliability import (
+    ReliabilityPolicy,
+    assess_reliability,
+    connection_margins_minutes,
+    connection_shortfall_penalty_minutes,
+)
 
 PARIS = ZoneInfo("Europe/Paris")
 NOW = datetime(2026, 7, 30, 8, 0, tzinfo=PARIS)
@@ -86,6 +91,48 @@ def test_stale_data_or_material_alert_has_low_confidence() -> None:
     assert assessment.confidence is Confidence.LOW
     assert assessment.robust_arrival == ARRIVAL + timedelta(minutes=10)
     assert len(assessment.reasons) == 2
+
+
+def test_connection_margin_subtracts_required_transfer_but_not_waiting() -> None:
+    first_arrival = NOW + timedelta(minutes=20)
+    second_departure = NOW + timedelta(minutes=27)
+    journey = TransitJourney(
+        duration_seconds=45 * 60,
+        departure=NOW,
+        arrival=NOW + timedelta(minutes=45),
+        response_timestamp=NOW,
+        transfers=1,
+        legs=(
+            TransitLeg(
+                type="public_transport",
+                duration_seconds=20 * 60,
+                departure=NOW,
+                arrival=first_arrival,
+                freshness=Freshness.REALTIME,
+            ),
+            TransitLeg(
+                type="transfer",
+                mode="walking",
+                duration_seconds=4 * 60,
+            ),
+            TransitLeg(type="waiting", duration_seconds=2 * 60),
+            TransitLeg(
+                type="public_transport",
+                duration_seconds=18 * 60,
+                departure=second_departure,
+                arrival=NOW + timedelta(minutes=45),
+                freshness=Freshness.REALTIME,
+            ),
+        ),
+    )
+
+    assert connection_margins_minutes(journey) == (3.0,)
+    assert connection_shortfall_penalty_minutes(journey, 5) == 2
+    assessment = assess_reliability(journey, arrival=journey.arrival, now=NOW)
+    assert assessment.confidence is Confidence.MEDIUM
+    assert assessment.minimum_connection_margin_minutes == 3
+    assert assessment.tight_connection_count == 1
+    assert "less than 5 minutes" in " ".join(assessment.reasons)
 
 
 def test_reliability_age_thresholds_must_be_ordered() -> None:

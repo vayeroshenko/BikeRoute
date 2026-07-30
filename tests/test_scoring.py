@@ -109,3 +109,4 @@ def test_mode_weights_accept_explicit_overrides() -> None:
     assert weights.transfers == 7
     assert weights.door_to_door == 0.5
     assert weights.disruptions == 1
+    assert weights.connection_margin == 3

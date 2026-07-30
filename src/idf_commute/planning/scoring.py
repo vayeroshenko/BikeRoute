@@ -12,6 +12,7 @@ from idf_commute.domain.models import (
     ScoreBreakdown,
     TransitJourney,
 )
+from idf_commute.planning.reliability import connection_shortfall_penalty_minutes
 
 
 class ScoreMode(StrEnum):
@@ -30,6 +31,7 @@ class ScoreWeights(BaseModel):
     transfers: float = Field(default=1, ge=0)
     disruptions: float = Field(default=1, ge=0)
     freshness: float = Field(default=1, ge=0)
+    connection_margin: float = Field(default=1, ge=0)
     cycling_comfort: float = Field(default=1, ge=0)
 
 
@@ -40,6 +42,7 @@ SCORE_MODE_WEIGHTS: dict[ScoreMode, ScoreWeights] = {
         transfers=0,
         disruptions=0,
         freshness=0,
+        connection_margin=0,
         cycling_comfort=0,
     ),
     ScoreMode.FEWEST_TRANSFERS: ScoreWeights(
@@ -47,6 +50,7 @@ SCORE_MODE_WEIGHTS: dict[ScoreMode, ScoreWeights] = {
         transfers=5,
         disruptions=1,
         freshness=1,
+        connection_margin=3,
         cycling_comfort=0.5,
     ),
     ScoreMode.EASY_RIDE: ScoreWeights(
@@ -54,6 +58,7 @@ SCORE_MODE_WEIGHTS: dict[ScoreMode, ScoreWeights] = {
         transfers=1,
         disruptions=1,
         freshness=1,
+        connection_margin=1,
         cycling_comfort=4,
     ),
     ScoreMode.RELIABLE: ScoreWeights(
@@ -61,6 +66,7 @@ SCORE_MODE_WEIGHTS: dict[ScoreMode, ScoreWeights] = {
         transfers=1.5,
         disruptions=3,
         freshness=3,
+        connection_margin=4,
         cycling_comfort=0.5,
     ),
 }
@@ -96,6 +102,7 @@ def score_outbound(
     preferred_bike_minutes: float,
     max_bike_minutes: float,
     disruption_penalty_minutes: float = 0,
+    minimum_connection_minutes: float = 5,
     weights: ScoreWeights | None = None,
 ) -> ScoreBreakdown:
     active_weights = weights or ScoreWeights()
@@ -120,6 +127,10 @@ def score_outbound(
         if leg.type == "public_transport" and leg.freshness is not Freshness.REALTIME
     )
     freshness_penalty = scheduled_critical_legs * 3.0
+    connection_penalty = connection_shortfall_penalty_minutes(
+        transit_journey,
+        minimum_connection_minutes,
+    )
     comfort_penalty = _cycling_comfort_penalty(bike_route)
     total = (
         door_to_door * active_weights.door_to_door
@@ -127,6 +138,7 @@ def score_outbound(
         + transfer_penalty * active_weights.transfers
         + disruption_penalty_minutes * active_weights.disruptions
         + freshness_penalty * active_weights.freshness
+        + connection_penalty * active_weights.connection_margin
         + comfort_penalty * active_weights.cycling_comfort
     )
     return ScoreBreakdown(
@@ -135,6 +147,7 @@ def score_outbound(
         transfer_penalty_minutes=transfer_penalty,
         disruption_penalty_minutes=disruption_penalty_minutes,
         freshness_penalty_minutes=freshness_penalty,
+        connection_margin_penalty_minutes=connection_penalty,
         cycling_comfort_penalty_minutes=comfort_penalty,
         total_minutes=total,
     )

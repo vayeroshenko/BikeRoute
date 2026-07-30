@@ -48,6 +48,7 @@ scoring:
     assert config.state.sqlite_path == Path("data/commute.sqlite3")
     assert config.reliability.fresh_age_seconds == 120
     assert config.reliability.stale_age_seconds == 300
+    assert config.reliability.minimum_connection_minutes == 5
 
 
 def test_missing_api_key_stops_live_access(monkeypatch: pytest.MonkeyPatch) -> None:

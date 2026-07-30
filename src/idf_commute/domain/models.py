@@ -225,6 +225,7 @@ class ScoreBreakdown(DomainModel):
     transfer_penalty_minutes: float = Field(ge=0)
     disruption_penalty_minutes: float = Field(ge=0)
     freshness_penalty_minutes: float = Field(ge=0)
+    connection_margin_penalty_minutes: float = Field(default=0, ge=0)
     cycling_comfort_penalty_minutes: float = Field(ge=0)
     total_minutes: float = Field(ge=0)
 
@@ -236,6 +237,8 @@ class ReliabilityAssessment(DomainModel):
     safety_buffer_minutes: float = Field(ge=0)
     realtime_leg_count: int = Field(ge=0)
     scheduled_leg_count: int = Field(ge=0)
+    minimum_connection_margin_minutes: float | None = None
+    tight_connection_count: int = Field(default=0, ge=0)
     reasons: tuple[str, ...] = ()
 
     @model_validator(mode="after")

@@ -77,6 +77,7 @@ class ScoreWeightOverrides(BaseModel):
     transfers: float | None = Field(default=None, ge=0)
     disruptions: float | None = Field(default=None, ge=0)
     freshness: float | None = Field(default=None, ge=0)
+    connection_margin: float | None = Field(default=None, ge=0)
     cycling_comfort: float | None = Field(default=None, ge=0)
 
 
@@ -94,6 +95,7 @@ class StateConfig(BaseModel):
 class ReliabilityConfig(BaseModel):
     fresh_age_seconds: float = Field(default=120, gt=0)
     stale_age_seconds: float = Field(default=300, gt=0)
+    minimum_connection_minutes: float = Field(default=5, ge=0)
     medium_buffer_minutes: float = Field(default=5, ge=0)
     low_buffer_minutes: float = Field(default=10, ge=0)
 

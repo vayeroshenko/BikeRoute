@@ -38,7 +38,7 @@ scoring:
   # balanced | fastest | fewest-transfers | easy-ride | reliable
   mode: balanced
   # Optional non-negative multipliers override the selected mode. Replace {}
-  # with keys such as: {transfers: 7, disruptions: 2, freshness: 3}.
+  # with keys such as: {transfers: 7, connection_margin: 3, freshness: 3}.
   weights: {}
 
 state:
@@ -48,6 +48,7 @@ state:
 reliability:
   fresh_age_seconds: 120
   stale_age_seconds: 300
+  minimum_connection_minutes: 5
   medium_buffer_minutes: 5
   low_buffer_minutes: 10
 

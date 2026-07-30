@@ -269,6 +269,9 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             disruption_penalty_minutes=disruption_penalty_minutes(matched),
+            minimum_connection_minutes=(
+                request.reliability_policy.minimum_connection_minutes
+            ),
             weights=request.score_weights,
         )
         return OutboundOption(
@@ -304,6 +307,9 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             disruption_penalty_minutes=disruption_penalty_minutes(matched),
+            minimum_connection_minutes=(
+                request.reliability_policy.minimum_connection_minutes
+            ),
             weights=request.score_weights,
         )
         return OutboundOption(
@@ -462,6 +468,9 @@ class ReturnPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             disruption_penalty_minutes=disruption_penalty_minutes(matched),
+            minimum_connection_minutes=(
+                request.reliability_policy.minimum_connection_minutes
+            ),
             weights=request.score_weights,
         )
         return ReturnOption(

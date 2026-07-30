@@ -912,6 +912,8 @@ def _render_option_details(
         f"transfers {score.transfer_penalty_minutes:.1f}x{weights.transfers:g} + "
         f"alerts {score.disruption_penalty_minutes:.1f}x{weights.disruptions:g} + "
         f"freshness {score.freshness_penalty_minutes:.1f}x{weights.freshness:g} + "
+        f"connections {score.connection_margin_penalty_minutes:.1f}x"
+        f"{weights.connection_margin:g} + "
         f"comfort {score.cycling_comfort_penalty_minutes:.1f}x"
         f"{weights.cycling_comfort:g}"
     )
@@ -971,6 +973,11 @@ def _render_reliability(reliability: ReliabilityAssessment | None) -> None:
         f"Confidence: {reliability.confidence.value} · data age {age} · "
         f"robust arrival {reliability.robust_arrival:%H:%M}"
     )
+    if reliability.minimum_connection_margin_minutes is not None:
+        console.print(
+            "Connection margin: "
+            f"{reliability.minimum_connection_margin_minutes:.1f} min minimum"
+        )
     for reason in reliability.reasons:
         console.print(f"  - {reason}")
 
@@ -1093,7 +1100,9 @@ def _score_weights_summary(weights: ScoreWeights) -> str:
     return (
         f"door x{weights.door_to_door:g}, bike x{weights.bike_penalty:g}, "
         f"transfers x{weights.transfers:g}, alerts x{weights.disruptions:g}, "
-        f"freshness x{weights.freshness:g}, comfort x{weights.cycling_comfort:g}"
+        f"freshness x{weights.freshness:g}, "
+        f"connections x{weights.connection_margin:g}, "
+        f"comfort x{weights.cycling_comfort:g}"
     )
 
 

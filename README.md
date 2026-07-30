@@ -144,8 +144,8 @@ scoring:
 ```
 
 Available weight keys are `door_to_door`, `bike_penalty`, `transfers`,
-`disruptions`, `freshness`, and `cycling_comfort`. The CLI prints the active
-profile and every multiplier used in each score.
+`disruptions`, `freshness`, `connection_margin`, and `cycling_comfort`. The CLI
+prints the active profile and every multiplier used in each score.
 
 ## Bicycle location state
 
@@ -259,11 +259,16 @@ separately and adds the configured explicit safety buffer:
 reliability:
   fresh_age_seconds: 120
   stale_age_seconds: 300
+  minimum_connection_minutes: 5
   medium_buffer_minutes: 5
   low_buffer_minutes: 10
 ```
 
 This avoids presenting an app-generated buffer as an official realtime ETA.
+For transfers, usable margin is the time between public-transport legs after
+subtracting required non-waiting transfer sections. Shortfalls below
+`minimum_connection_minutes` lower confidence and add a visible score
+component; the `reliable` and `fewest-transfers` modes weight it most strongly.
 
 ## Offline checks
 

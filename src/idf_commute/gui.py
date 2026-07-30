@@ -508,6 +508,11 @@ def _reliability_details(reliability: ReliabilityAssessment | None) -> None:
         f"provider data age {age} · "
         f"robust arrival **{reliability.robust_arrival:%H:%M}**"
     )
+    if reliability.minimum_connection_margin_minutes is not None:
+        st.markdown(
+            f"Minimum usable connection margin: "
+            f"**{reliability.minimum_connection_margin_minutes:.1f} min**"
+        )
     for reason in reliability.reasons:
         st.caption(f"• {reason}")
 
@@ -520,6 +525,7 @@ def _score_details(score: Any) -> None:
         f"transfers {score.transfer_penalty_minutes:.1f} · "
         f"alerts {score.disruption_penalty_minutes:.1f} · "
         f"freshness {score.freshness_penalty_minutes:.1f} · "
+        f"connections {score.connection_margin_penalty_minutes:.1f} · "
         f"comfort {score.cycling_comfort_penalty_minutes:.1f}"
     )
 
