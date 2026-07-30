@@ -73,6 +73,7 @@ class OutboundPlanner:
                     rejections.append(
                         CandidateRejection(
                             station_id=station.id,
+                            station_name=station.name,
                             bike_route_title=route.title,
                             bike_duration_minutes=minutes,
                             reason="bike route exceeds hard maximum",
@@ -101,6 +102,7 @@ class OutboundPlanner:
                 rejections.append(
                     CandidateRejection(
                         station_id=station.id,
+                        station_name=station.name,
                         bike_route_title=route.title,
                         bike_duration_minutes=route.duration_seconds / 60,
                         reason="no transit journey returned from exact station",
@@ -112,6 +114,7 @@ class OutboundPlanner:
                 rejections.append(
                     CandidateRejection(
                         station_id=station.id,
+                        station_name=station.name,
                         bike_route_title=route.title,
                         bike_duration_minutes=route.duration_seconds / 60,
                         reason="transit departure leaves insufficient bike/parking time",

@@ -81,8 +81,12 @@ class TransitLeg(DomainModel):
     freshness: Freshness = Freshness.UNKNOWN
     line_id: str | None = None
     line_code: str | None = None
+    commercial_mode: str | None = None
+    direction: str | None = None
     origin_id: str | None = None
     destination_id: str | None = None
+    origin_name: str | None = None
+    destination_name: str | None = None
     disruption_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")

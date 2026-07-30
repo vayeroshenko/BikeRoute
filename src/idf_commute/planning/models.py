@@ -42,6 +42,7 @@ class OutboundPlanningRequest(DomainModel):
 
 class CandidateRejection(DomainModel):
     station_id: str
+    station_name: str | None = None
     bike_route_title: str | None = None
     bike_duration_minutes: float | None = Field(default=None, ge=0)
     reason: str

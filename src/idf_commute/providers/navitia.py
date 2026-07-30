@@ -162,8 +162,12 @@ def _normalize_leg(raw: Mapping[str, Any]) -> TransitLeg:
         freshness=freshness,
         line_id=_linked_id(raw.get("links"), "line"),
         line_code=_optional_string(display.get("code") or display.get("label")),
+        commercial_mode=_display_name(display.get("commercial_mode")),
+        direction=_optional_string(display.get("direction")),
         origin_id=_place_id(raw.get("from")),
         destination_id=_place_id(raw.get("to")),
+        origin_name=_place_name(raw.get("from")),
+        destination_name=_place_name(raw.get("to")),
         disruption_ids=tuple(_linked_ids(raw.get("links"), "disruption")),
     )
 
@@ -225,6 +229,27 @@ def _place_id(value: Any) -> str | None:
             nested_id = nested.get("id")
             return nested_id if isinstance(nested_id, str) else None
     return None
+
+
+def _place_name(value: Any) -> str | None:
+    if not isinstance(value, Mapping):
+        return None
+    direct_name = _optional_string(value.get("name"))
+    if direct_name:
+        return direct_name
+    for nested_key in ("stop_area", "stop_point"):
+        nested_name = _nested_name(value.get(nested_key))
+        if nested_name:
+            return nested_name
+    return None
+
+
+def _nested_name(value: Any) -> str | None:
+    return _optional_string(_mapping(value).get("name"))
+
+
+def _display_name(value: Any) -> str | None:
+    return _optional_string(value) or _nested_name(value)
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

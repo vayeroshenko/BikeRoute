@@ -30,7 +30,23 @@ def station_fixture_payload() -> object:
 
 
 def test_normalizes_mixed_section_freshness() -> None:
-    journeys = normalize_navitia_journeys(fixture_payload())
+    payload = fixture_payload()
+    assert isinstance(payload, dict)
+    section = payload["journeys"][0]["sections"][1]
+    section["display_informations"] = {
+        "code": "B",
+        "direction": "Saint-Rémy-lès-Chevreuse",
+        "commercial_mode": {"name": "RER"},
+    }
+    section["from"] = {
+        "id": "stop_point:bourg",
+        "stop_point": {"name": "Bourg-la-Reine"},
+    }
+    section["to"] = {
+        "id": "stop_point:massyp",
+        "stop_point": {"name": "Massy - Palaiseau"},
+    }
+    journeys = normalize_navitia_journeys(payload)
     assert len(journeys) == 1
     journey = journeys[0]
     assert journey.departure.tzinfo == PARIS
@@ -41,6 +57,11 @@ def test_normalizes_mixed_section_freshness() -> None:
         Freshness.REALTIME,
         Freshness.BASE_SCHEDULE,
     ]
+    assert transit_legs[0].commercial_mode == "RER"
+    assert transit_legs[0].line_code == "B"
+    assert transit_legs[0].direction == "Saint-Rémy-lès-Chevreuse"
+    assert transit_legs[0].origin_name == "Bourg-la-Reine"
+    assert transit_legs[0].destination_name == "Massy - Palaiseau"
 
 
 def test_rejects_missing_required_journey_times() -> None:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+import html
+import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
@@ -18,7 +20,15 @@ from idf_commute.config import (
     load_config,
     safe_settings_summary,
 )
-from idf_commute.domain.models import Location, OutboundOptionKind, Station
+from idf_commute.domain.models import (
+    BikeRoute,
+    Freshness,
+    Location,
+    OutboundOption,
+    OutboundOptionKind,
+    Station,
+    TransitLeg,
+)
 from idf_commute.planning.models import OutboundPlan, OutboundPlanningRequest
 from idf_commute.planning.planner import OutboundPlanner
 from idf_commute.probe import (
@@ -286,16 +296,10 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
             str(len(option.matched_disruptions)),
         )
     console.print(table)
+    if plan.options:
+        console.print("\n[bold]Detailed itineraries[/bold]")
     for rank, option in enumerate(plan.options, start=1):
-        score = option.score
-        console.print(
-            f"[bold]#{rank} score[/bold]: door {score.door_to_door_minutes:.1f} + "
-            f"bike {score.bike_penalty_minutes:.1f} + "
-            f"transfers {score.transfer_penalty_minutes:.1f} + "
-            f"alerts {score.disruption_penalty_minutes:.1f} + "
-            f"freshness {score.freshness_penalty_minutes:.1f} + "
-            f"comfort {score.cycling_comfort_penalty_minutes:.1f}"
-        )
+        _render_option_details(rank, option)
     if plan.rejections:
         console.print(f"[yellow]{len(plan.rejections)} candidate route(s) rejected.[/yellow]")
         for rejection in plan.rejections:
@@ -305,10 +309,179 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
                 else ""
             )
             console.print(
-                f"- {rejection.station_id} / "
+                f"- {rejection.station_name or rejection.station_id} / "
                 f"{rejection.bike_route_title or 'no bike route'}{duration}: "
                 f"{rejection.reason}"
             )
+
+
+def _render_option_details(rank: int, option: OutboundOption) -> None:
+    journey = option.transit_journey
+    kind = (
+        f"bike to {option.station.name}"
+        if option.station is not None
+        else "all transit"
+    )
+    console.rule(f"#{rank} · {kind}")
+    status = f" · status {journey.status}" if journey.status else ""
+    console.print(
+        f"Door to door: {option.departure:%H:%M} → {option.arrival:%H:%M} "
+        f"({_format_duration(round((option.arrival - option.departure).total_seconds()))})"
+        f"{status}"
+    )
+    if journey.response_timestamp is not None:
+        console.print(
+            f"Transit response generated: "
+            f"{journey.response_timestamp:%Y-%m-%d %H:%M:%S %Z}"
+        )
+    if option.bike_route is not None:
+        _render_bike_details(option)
+    _render_transit_legs(journey.legs)
+    score = option.score
+    console.print(
+        f"Score {score.total_minutes:.1f}: door {score.door_to_door_minutes:.1f} + "
+        f"bike {score.bike_penalty_minutes:.1f} + "
+        f"transfers {score.transfer_penalty_minutes:.1f} + "
+        f"alerts {score.disruption_penalty_minutes:.1f} + "
+        f"freshness {score.freshness_penalty_minutes:.1f} + "
+        f"comfort {score.cycling_comfort_penalty_minutes:.1f}"
+    )
+    displayed_alerts: set[tuple[str, str]] = set()
+    for disruption in option.matched_disruptions:
+        alert_key = (disruption.title, disruption.message)
+        if alert_key in displayed_alerts:
+            continue
+        displayed_alerts.add(alert_key)
+        qualifiers = " / ".join(
+            value
+            for value in (disruption.severity, disruption.effect, disruption.cause)
+            if value
+        )
+        suffix = f" [{qualifiers}]" if qualifiers else ""
+        console.print(f"Alert: {disruption.title}{suffix}", style="yellow", markup=False)
+        message = _clean_alert_message(disruption.message)
+        if message and message != disruption.title:
+            console.print(f"  {message}", markup=False)
+
+
+def _render_bike_details(option: OutboundOption) -> None:
+    route = option.bike_route
+    if route is None:
+        return
+    bike_arrival = option.departure + timedelta(seconds=route.duration_seconds)
+    ready_at = bike_arrival + timedelta(seconds=option.parking_buffer_seconds)
+    console.print(
+        f"Bike {route.title}: {route.distance_m / 1000:.1f} km in "
+        f"{_format_duration(route.duration_seconds)} · "
+        f"elevation +{route.vertical_gain_m:.0f}/-{route.vertical_loss_m:.0f} m"
+    )
+    quality_parts = _bike_quality_parts(route)
+    if quality_parts:
+        console.print(f"Bike network: {' · '.join(quality_parts)}")
+    speed = (
+        f" · provider speed {route.average_speed_kmh:g} km/h"
+        if route.average_speed_kmh is not None
+        else ""
+    )
+    console.print(
+        f"Bike timing: leave {option.departure:%H:%M}, arrive {bike_arrival:%H:%M}, "
+        f"park {option.parking_buffer_seconds / 60:g} min, ready {ready_at:%H:%M}{speed}"
+    )
+
+
+def _bike_quality_parts(route: BikeRoute) -> list[str]:
+    parts: list[str] = []
+    if route.distance_m > 0:
+        parts.extend(
+            [
+                f"recommended {route.recommended_roads_m / route.distance_m:.0%}",
+                f"discouraged {route.discouraged_roads_m / route.distance_m:.0%}",
+            ]
+        )
+    facilities = sorted(
+        (
+            (name.replace("_", " "), distance)
+            for name, distance in route.facility_distances_m.items()
+            if distance > 0
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    parts.extend(f"{name} {distance / 1000:.1f} km" for name, distance in facilities[:4])
+    return parts
+
+
+def _render_transit_legs(legs: tuple[TransitLeg, ...]) -> None:
+    table = Table("Time", "Step", "Stops", "Duration", "Data", expand=True)
+    for leg in legs:
+        times = _leg_times(leg)
+        step = _leg_step(leg)
+        stops = (
+            f"{leg.origin_name or '?'} → {leg.destination_name or '?'}"
+            if leg.type == "public_transport"
+            else "—"
+        )
+        table.add_row(
+            times,
+            step,
+            stops,
+            _format_duration(leg.duration_seconds),
+            _leg_data(leg),
+        )
+    console.print(table)
+
+
+def _leg_times(leg: TransitLeg) -> str:
+    if leg.departure is not None and leg.arrival is not None:
+        return f"{leg.departure:%H:%M} → {leg.arrival:%H:%M}"
+    return "—"
+
+
+def _leg_step(leg: TransitLeg) -> str:
+    if leg.type == "public_transport":
+        line = " ".join(part for part in (leg.commercial_mode, leg.line_code) if part)
+        direction = f" → {leg.direction}" if leg.direction else ""
+        return f"{line or 'Transit'}{direction}"
+    labels = {
+        "crow_fly": "Station access",
+        "street_network": "Walk" if leg.mode == "walking" else (leg.mode or "Street"),
+        "transfer": "Transfer walk" if leg.mode == "walking" else "Transfer",
+        "waiting": "Wait",
+        "park": "Park bicycle",
+    }
+    return labels.get(leg.type, leg.mode or leg.type.replace("_", " ").title())
+
+
+def _leg_data(leg: TransitLeg) -> str:
+    if leg.freshness is Freshness.REALTIME:
+        label = "realtime"
+    elif leg.freshness is Freshness.BASE_SCHEDULE:
+        label = "schedule only"
+    else:
+        return "—"
+    if leg.departure is None or leg.base_departure is None:
+        return label
+    delay_minutes = round((leg.departure - leg.base_departure).total_seconds() / 60)
+    if delay_minutes == 0:
+        return f"{label} · on time"
+    sign = "+" if delay_minutes > 0 else ""
+    return f"{label} · {sign}{delay_minutes} min vs schedule"
+
+
+def _format_duration(seconds: int) -> str:
+    minutes = round(seconds / 60)
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, remaining = divmod(minutes, 60)
+    return f"{hours} h {remaining:02d} min"
+
+
+def _clean_alert_message(value: str, limit: int = 700) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", value)
+    cleaned = " ".join(html.unescape(without_tags).split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return f"{cleaned[: limit - 1].rstrip()}…"
 
 
 @plan_app.command("outbound")
