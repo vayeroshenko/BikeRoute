@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from idf_commute.cli import _confirm_return_selection
 from idf_commute.domain.models import (
     BikeRequest,
     BikeRoute,
@@ -18,6 +20,7 @@ from idf_commute.domain.models import (
     TransitRequest,
 )
 from idf_commute.domain.state import BikeLocation, BikeState
+from idf_commute.persistence import BikeStateStore
 from idf_commute.planning.models import ReturnPlanningRequest
 from idf_commute.planning.planner import ReturnPlanner
 
@@ -127,6 +130,40 @@ async def test_return_forces_transit_to_bicycle_station_then_cycles_home() -> No
     assert plan.options[0].arrival == datetime(2026, 7, 30, 19, 2, tzinfo=PARIS)
     assert plan.options[0].station.id == "stop_area:sceaux"
     assert [rejection.bike_duration_minutes for rejection in plan.rejections] == [60]
+
+
+@pytest.mark.asyncio
+async def test_return_confirmation_only_moves_bicycle_from_matching_station(
+    tmp_path: Path,
+) -> None:
+    plan = await ReturnPlanner(
+        bike_router=ReturnBikeRouter(),
+        transit_router=ReturnTransitRouter(),
+        disruption_provider=NoReturnDisruptions(),
+    ).plan(return_request())
+    store = BikeStateStore(tmp_path / "commute.sqlite3")
+    timestamp = datetime(2026, 7, 30, 18, 0, tzinfo=PARIS)
+
+    store.set_station(
+        "stop_area:antony",
+        station_name="Antony",
+        updated_at=timestamp,
+    )
+    with pytest.raises(ValueError, match="no longer matches"):
+        _confirm_return_selection(plan, 1, store)
+
+    store.set_station(
+        "stop_area:sceaux",
+        station_name="Sceaux",
+        updated_at=timestamp,
+    )
+    with pytest.raises(ValueError, match="contains 1 option"):
+        _confirm_return_selection(plan, 2, store)
+
+    state = _confirm_return_selection(plan, 1, store)
+    assert state.location is BikeLocation.HOME
+    assert state.source_journey_id == "journey:return"
+    assert store.load() == state
 
 
 def test_return_request_rejects_a_station_other_than_stored_bicycle() -> None:

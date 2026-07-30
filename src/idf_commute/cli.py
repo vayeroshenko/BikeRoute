@@ -159,6 +159,28 @@ def _confirm_outbound_selection(
     )
 
 
+def _confirm_return_selection(
+    plan: ReturnPlan,
+    rank: int,
+    store: BikeStateStore,
+) -> BikeState:
+    if rank < 1 or rank > len(plan.options):
+        raise ValueError(
+            f"Cannot confirm rank {rank}; this plan contains {len(plan.options)} option(s)"
+        )
+    option = plan.options[rank - 1]
+    current = store.load()
+    if (
+        current.location is not BikeLocation.STATION
+        or current.station_id != option.station.id
+    ):
+        raise ValueError(
+            "Cannot confirm return because the current bicycle state no longer "
+            f"matches {option.station.name} ({option.station.id})"
+        )
+    return store.set_home(source_journey_id=option.transit_journey.id)
+
+
 @bike_app.command("status")
 def bike_status(config: ConfigPath = Path("config.yaml")) -> None:
     """Show where the planner currently believes the bicycle is."""
@@ -1146,6 +1168,14 @@ def plan_return(
             help="Maximum number of ranked return itineraries to display.",
         ),
     ] = 10,
+    confirm_rank: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            max=20,
+            help="Confirm a displayed return rank and record the bicycle at home.",
+        ),
+    ] = None,
     score_mode: Annotated[
         ScoreMode | None,
         typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
@@ -1175,6 +1205,19 @@ def plan_return(
         console.print(f"[bold red]Return planning stopped:[/bold red] {exc}")
         raise typer.Exit(code=2) from None
     _render_return_plan(plan)
+    if confirm_rank is not None:
+        try:
+            _confirm_return_selection(
+                plan,
+                confirm_rank,
+                _bike_state_store(config),
+            )
+        except (FileNotFoundError, ValueError, ValidationError, sqlite3.Error) as exc:
+            console.print(f"[bold red]Return confirmation stopped:[/bold red] {exc}")
+            raise typer.Exit(code=2) from None
+        console.print(
+            f"Confirmed #{confirm_rank}: bicycle recorded at [bold]home[/bold]."
+        )
 
 
 if __name__ == "__main__":

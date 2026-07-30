@@ -127,6 +127,7 @@ def test_plan_return_help_is_available() -> None:
     assert "--max-walking-minutes" in result.output
     assert "--max-walking-leg-mi" in result.output
     assert "--max-results" in result.output
+    assert "--confirm-rank" in result.output
     assert "--score-mode" in result.output
 
 

@@ -7,8 +7,8 @@ for Navitia journeys, Geovelo routes, bulk disruptions, and optional SIRI Stop
 Monitoring. It also implements explicit outbound bike-to-station orchestration,
 hard/soft bicycle thresholds, disruption-aware ranking, an all-transit
 baseline, terminal output, and local SQLite bicycle-location state.
-Route-selection confirmation, return/round-trip planning, and a graphical UI
-are not implemented.
+Outbound/return route confirmation and exact-station return planning are also
+implemented. Round-trip ranking and a graphical UI are not implemented.
 
 ## Setup
 
@@ -204,8 +204,17 @@ The transit request is forced from work to the exact stored stop-area. The
 planner then adds the retrieval buffer and a Geovelo route from that station
 home. It never substitutes a different bicycle station. Bicycle and walking
 limits, scoring modes, disruption matching, and detailed transit legs remain
-available. This command is read-only for bicycle state; explicit completion is
-implemented separately.
+available. The command remains read-only unless a displayed option is
+explicitly confirmed:
+
+```bash
+idf-commute plan return --config config.yaml \
+  --depart-at 2026-07-30T18:00:00+02:00 --confirm-rank 1
+```
+
+Confirmation records the bicycle at home only if the stored station still
+matches the selected return. A changed or stale state is rejected rather than
+silently moving the bicycle.
 
 ## Offline checks
 
