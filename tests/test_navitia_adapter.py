@@ -79,6 +79,7 @@ async def test_adapter_builds_arrive_by_request() -> None:
         assert request.url.params["datetime"] == "20260730T083000"
         assert request.url.params["datetime_represents"] == "arrival"
         assert request.url.params.get_list("forbidden_uris[]") == ["line:one", "line:two"]
+        assert request.url.params["min_nb_journeys"] == "10"
         return httpx.Response(200, json=fixture_payload())
 
     transit_request = TransitRequest(
@@ -87,6 +88,7 @@ async def test_adapter_builds_arrive_by_request() -> None:
         datetime=datetime(2026, 7, 30, 8, 30, tzinfo=PARIS),
         arrive_by=True,
         forbidden_ids=("line:one", "line:two"),
+        min_journeys=10,
     )
     async with PrimClient(
         "secret",

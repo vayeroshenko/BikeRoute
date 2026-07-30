@@ -62,6 +62,7 @@ class TransitRequest(DomainModel):
     arrive_by: bool = False
     data_freshness: Freshness = Freshness.REALTIME
     forbidden_ids: tuple[str, ...] = ()
+    min_journeys: int | None = Field(default=None, ge=1, le=20)
 
     @model_validator(mode="after")
     def validate_datetime(self) -> TransitRequest:

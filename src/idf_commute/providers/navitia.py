@@ -37,6 +37,8 @@ class NavitiaAdapter:
             params["datetime_represents"] = "arrival" if request.arrive_by else "departure"
         if request.forbidden_ids:
             params["forbidden_uris[]"] = list(request.forbidden_ids)
+        if request.min_journeys is not None:
+            params["min_nb_journeys"] = request.min_journeys
         response = await self._client.get_json(f"{self._base_url}/journeys", params=params)
         return normalize_navitia_journeys(response.body)
 

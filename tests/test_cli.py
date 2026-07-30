@@ -62,6 +62,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert result.exit_code == 0
     assert "--depart-at" in result.output
     assert "--max-bike-minutes" in result.output
+    assert "--max-results" in result.output
 
 
 def test_naive_departure_uses_configured_timezone() -> None:
@@ -203,6 +204,7 @@ def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(
 
     rendered = output.getvalue()
     assert "Bike RECOMMENDED: 5.6 km in 21 min" in rendered
+    assert "Bus 197" in rendered
     assert "Bus 197 → Bourg-la-Reine" in rendered
     assert "Laplace RER → Bourg-la-Reine RER" in rendered
     assert "realtime · +2 min vs schedule" in rendered

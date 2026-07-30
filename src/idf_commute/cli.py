@@ -171,6 +171,7 @@ async def _run_outbound_plan(
     config_path: Path,
     depart_at_text: str,
     max_bike_minutes: float | None,
+    max_results: int,
 ) -> OutboundPlan:
     config = load_config(config_path)
     settings = Settings()
@@ -212,6 +213,7 @@ async def _run_outbound_plan(
                 bike_profile=config.bicycle.profile,
                 bike_type=config.bicycle.bike_type,
                 bike_average_speed_kmh=config.bicycle.average_speed_kmh,
+                max_results=max_results,
             )
         )
 
@@ -279,7 +281,16 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
         f"hard maximum {plan.max_bike_minutes:g} min"
     )
-    table = Table("Rank", "Type", "Station", "Bike", "Arrival", "Score", "Alerts")
+    table = Table(
+        "Rank",
+        "Type",
+        "Station",
+        "Bike",
+        "Transit",
+        "Arrival",
+        "Score",
+        "Alerts",
+    )
     for rank, option in enumerate(plan.options, start=1):
         bike = (
             f"{option.bike_route.duration_seconds / 60:.0f} min ({option.bike_route.title})"
@@ -291,6 +302,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
             "bike + transit" if option.kind is OutboundOptionKind.BIKE_TRANSIT else "all transit",
             option.station.name if option.station else "—",
             bike,
+            _transit_summary(option.transit_journey.legs),
             option.arrival.strftime("%H:%M"),
             f"{option.score.total_minutes:.1f}",
             str(len(option.matched_disruptions)),
@@ -452,6 +464,17 @@ def _leg_step(leg: TransitLeg) -> str:
     return labels.get(leg.type, leg.mode or leg.type.replace("_", " ").title())
 
 
+def _transit_summary(legs: tuple[TransitLeg, ...]) -> str:
+    labels = [
+        " ".join(part for part in (leg.commercial_mode, leg.line_code) if part)
+        or leg.line_id
+        or "transit"
+        for leg in legs
+        if leg.type == "public_transport"
+    ]
+    return " → ".join(labels) or "—"
+
+
 def _leg_data(leg: TransitLeg) -> str:
     if leg.freshness is Freshness.REALTIME:
         label = "realtime"
@@ -495,10 +518,20 @@ def plan_outbound(
         float | None,
         typer.Option(help="Override bicycle hard limit for this run; config.yaml is unchanged."),
     ] = None,
+    max_results: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            max=20,
+            help="Maximum number of distinct ranked itineraries to display.",
+        ),
+    ] = 10,
 ) -> None:
     """Plan bike-to-station plus transit options and an all-transit baseline."""
     try:
-        plan = asyncio.run(_run_outbound_plan(config, depart_at, max_bike_minutes))
+        plan = asyncio.run(
+            _run_outbound_plan(config, depart_at, max_bike_minutes, max_results)
+        )
     except (
         FileNotFoundError,
         ValueError,

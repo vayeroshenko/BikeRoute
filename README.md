@@ -54,13 +54,22 @@ for outbound planner behavior and current live findings.
 idf-commute plan outbound \
   --config config.yaml \
   --depart-at 2026-07-30T08:00:00+02:00 \
-  --max-bike-minutes 25
+  --max-bike-minutes 25 \
+  --max-results 10
 ```
 
 The command never relaxes the configured hard bicycle limit. Rejected routes
 show their measured duration and reason. `--max-bike-minutes` changes the hard
 limit for one run without editing `config.yaml`; for a persistent change, set
 `bicycle.max_bike_minutes` in the ignored local configuration.
+
+The comparison requests multiple Navitia journeys per origin, keeps distinct
+transit line sequences, and reserves up to 60% of the result list for
+all-transit alternatives so bike-route variants cannot hide options such as a
+direct bus, replacement bus, or metro chain. `--max-results` accepts 1–20 and
+defaults to 10. Each ranked result includes its full leg sequence, stop names,
+waits, transfers, realtime/base-schedule status, bicycle metrics, and cleaned
+disruption notices.
 
 ## Offline checks
 

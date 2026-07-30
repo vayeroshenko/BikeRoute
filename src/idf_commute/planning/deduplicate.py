@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from idf_commute.domain.models import OutboundOption
+from idf_commute.domain.models import OutboundOption, OutboundOptionKind
 
 
 def deduplicate_outbound_options(
@@ -21,6 +21,32 @@ def deduplicate_outbound_options(
         if len(unique) == limit:
             break
     return unique
+
+
+def select_diverse_outbound_options(
+    options: list[OutboundOption],
+    *,
+    limit: int,
+) -> list[OutboundOption]:
+    """Keep score order while reserving up to 60% for transit-only alternatives."""
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    ranked = sorted(options, key=lambda option: option.score.total_minutes)
+    unique = deduplicate_outbound_options(ranked, limit=max(len(ranked), 1))
+    transit_reserve = min(6, max(1, (limit * 3 + 4) // 5))
+    selected = [
+        option
+        for option in unique
+        if option.kind is OutboundOptionKind.ALL_TRANSIT
+    ][:transit_reserve]
+    selected_ids = {id(option) for option in selected}
+    for option in unique:
+        if len(selected) == limit:
+            break
+        if id(option) not in selected_ids:
+            selected.append(option)
+            selected_ids.add(id(option))
+    return sorted(selected, key=lambda option: option.score.total_minutes)
 
 
 def outbound_option_signature(option: OutboundOption) -> tuple[object, ...]:

@@ -61,6 +61,31 @@ class FakeTransitRouter:
         ]
 
 
+class AlternativeTransitRouter(FakeTransitRouter):
+    async def journeys(self, request: TransitRequest) -> list[TransitJourney]:
+        journeys = await super().journeys(request)
+        first = journeys[0]
+        alternative_departure = first.departure + timedelta(minutes=3)
+        return [
+            first,
+            first.model_copy(
+                update={
+                    "duration_seconds": 35 * 60,
+                    "departure": alternative_departure,
+                    "arrival": alternative_departure + timedelta(minutes=35),
+                    "legs": (
+                        first.legs[0].model_copy(
+                            update={
+                                "line_id": "line:bus-394",
+                                "line_code": "394",
+                            }
+                        ),
+                    ),
+                }
+            ),
+        ]
+
+
 class FakeDisruptions:
     async def disruptions(
         self,
@@ -135,3 +160,27 @@ async def test_disruptions_are_matched_and_scored() -> None:
     ).plan(planning_request())
     assert all(option.matched_disruptions for option in plan.options)
     assert all(option.score.disruption_penalty_minutes == 12 for option in plan.options)
+
+
+@pytest.mark.asyncio
+async def test_keeps_distinct_alternative_journeys_from_each_origin() -> None:
+    request = planning_request().model_copy(update={"max_results": 10})
+    transit = AlternativeTransitRouter()
+    plan = await OutboundPlanner(
+        bike_router=FakeBikeRouter(),
+        transit_router=transit,
+        disruption_provider=FakeDisruptions(),
+    ).plan(request)
+
+    bike_options = [
+        option for option in plan.options if option.kind is OutboundOptionKind.BIKE_TRANSIT
+    ]
+    baseline_options = [
+        option for option in plan.options if option.kind is OutboundOptionKind.ALL_TRANSIT
+    ]
+    assert len(bike_options) == 4
+    assert len(baseline_options) == 2
+    assert all(request.min_journeys == 10 for request in transit.requests)
+    assert {
+        option.transit_journey.legs[0].line_code for option in baseline_options
+    } == {None, "394"}

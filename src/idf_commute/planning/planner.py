@@ -14,7 +14,7 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitRequest,
 )
-from idf_commute.planning.deduplicate import deduplicate_outbound_options
+from idf_commute.planning.deduplicate import select_diverse_outbound_options
 from idf_commute.planning.disruptions import (
     disruption_penalty_minutes,
     match_journey_disruptions,
@@ -109,8 +109,10 @@ class OutboundPlanner:
                     )
                 )
                 continue
-            journey = journeys[0]
-            if journey.departure < ready_at:
+            viable_journeys = [
+                journey for journey in journeys if journey.departure >= ready_at
+            ]
+            if not viable_journeys:
                 rejections.append(
                     CandidateRejection(
                         station_id=station.id,
@@ -121,25 +123,23 @@ class OutboundPlanner:
                     )
                 )
                 continue
-            options.append(
+            options.extend(
                 self._bike_transit_option(
-                    request,
-                    station,
-                    route,
-                    journey,
-                    disruptions,
+                    request, station, route, journey, disruptions
                 )
+                for journey in viable_journeys
             )
 
-        if baseline_journeys:
-            options.append(self._baseline_option(request, baseline_journeys[0], disruptions))
-        options.sort(key=lambda option: option.score.total_minutes)
+        options.extend(
+            self._baseline_option(request, journey, disruptions)
+            for journey in baseline_journeys
+        )
         return OutboundPlan(
             requested_departure=request.depart_at,
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             options=tuple(
-                deduplicate_outbound_options(
+                select_diverse_outbound_options(
                     options,
                     limit=request.max_results,
                 )
@@ -181,6 +181,7 @@ class OutboundPlanner:
                     origin_id=station.id,
                     destination_id=request.work_transit_id,
                     datetime=ready_at,
+                    min_journeys=request.max_results,
                 )
             )
 
@@ -194,6 +195,7 @@ class OutboundPlanner:
                     origin_id=request.home_transit_id,
                     destination_id=request.work_transit_id,
                     datetime=request.depart_at,
+                    min_journeys=request.max_results,
                 )
             )
 
