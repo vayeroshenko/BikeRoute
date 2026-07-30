@@ -10,6 +10,13 @@ from idf_commute.config import AppConfig, MissingAccessError, Settings
 def test_example_config_is_valid() -> None:
     config = AppConfig.from_yaml(Path("config.example.yaml"))
     assert config.scoring.mode.value == "balanced"
+    assert [
+        (station_range.start, station_range.end)
+        for station_range in config.bicycle.best_station_ranges
+    ] == [
+        ("Laplace", "Bourg-la-Reine"),
+        ("Bourg-la-Reine", "Sceaux"),
+    ]
 
 
 def test_yaml_config_loads(tmp_path: Path) -> None:

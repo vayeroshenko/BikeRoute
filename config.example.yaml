@@ -24,6 +24,11 @@ bicycle:
   parking_buffer_minutes: 4
   target_line_id: "line:IDFM:C01743"
   target_line_label: "RER B"
+  # Optional paths considered by --bike-station best. Paths may overlap;
+  # each resulting station is queried only once.
+  best_station_ranges:
+    - {start: "Laplace", end: "Bourg-la-Reine"}
+    - {start: "Bourg-la-Reine", end: "Sceaux"}
 
 walking:
   max_minutes: 30

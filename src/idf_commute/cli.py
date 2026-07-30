@@ -39,6 +39,10 @@ from idf_commute.planning.planner import (
     walking_duration_minutes,
 )
 from idf_commute.planning.scoring import ScoreMode, ScoreWeights, weights_for_mode
+from idf_commute.planning.stations import (
+    parse_station_range,
+    rer_b_stations_in_ranges,
+)
 from idf_commute.probe import (
     ProbeError,
     ProbeResult,
@@ -183,6 +187,7 @@ async def _run_outbound_plan(
     max_walking_leg_minutes: float | None,
     max_results: int,
     bike_station: str | None,
+    bike_station_ranges: list[str] | None,
     score_mode: ScoreMode | None,
 ) -> OutboundPlan:
     config = load_config(config_path)
@@ -215,6 +220,7 @@ async def _run_outbound_plan(
             navitia,
             bike_station,
             hard_minutes,
+            bike_station_ranges,
         )
         planner = OutboundPlanner(
             bike_router=GeoveloAdapter(client, str(settings.geovelo_url)),
@@ -289,7 +295,21 @@ async def _select_bike_stations(
     stations_provider: StationProvider,
     selection: str | None,
     max_bike_minutes: float,
+    range_overrides: list[str] | None = None,
 ) -> list[Station]:
+    configured_ranges = [
+        (station_range.start, station_range.end)
+        for station_range in config.bicycle.best_station_ranges
+    ]
+    ranges = (
+        [parse_station_range(value) for value in range_overrides]
+        if range_overrides
+        else configured_ranges
+    )
+    if range_overrides and (selection or "").casefold() != "best":
+        raise ValueError(
+            "--bike-station-range can only be used with --bike-station best"
+        )
     if selection is None:
         if not config.candidate_stations:
             raise ValueError(
@@ -305,6 +325,10 @@ async def _select_bike_stations(
     line_stations = await stations_provider.line_stations(line_id)
     usable = [station for station in line_stations if station.location is not None]
     if selection.casefold() == "best":
+        if ranges:
+            if line_id != "line:IDFM:C01743":
+                raise ValueError("Station ranges currently support RER B only")
+            usable = rer_b_stations_in_ranges(usable, ranges)
         radius_km = (
             config.bicycle.average_speed_kmh * max_bike_minutes / 60 * 1.5
         )
@@ -740,6 +764,15 @@ def plan_outbound(
             )
         ),
     ] = None,
+    bike_station_range: Annotated[
+        list[str] | None,
+        typer.Option(
+            help=(
+                "RER B range for 'best' as START..END. Repeat to combine "
+                "branches; repeated stations are queried once."
+            )
+        ),
+    ] = None,
     score_mode: Annotated[
         ScoreMode | None,
         typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
@@ -756,6 +789,7 @@ def plan_outbound(
                 max_walking_leg_minutes,
                 max_results,
                 bike_station,
+                bike_station_range,
                 score_mode,
             )
         )

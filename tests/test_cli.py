@@ -20,7 +20,7 @@ from idf_commute.cli import (
     _select_bike_stations,
     app,
 )
-from idf_commute.config import AppConfig, CandidateStation
+from idf_commute.config import AppConfig, CandidateStation, StationRangeConfig
 from idf_commute.domain.models import (
     BikeRoute,
     Disruption,
@@ -69,6 +69,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--max-walking-leg-mi" in result.output
     assert "--max-results" in result.output
     assert "--bike-station" in result.output
+    assert "--bike-station-range" in result.output
     assert "--score-mode" in result.output
 
 
@@ -147,6 +148,9 @@ async def test_best_station_search_prefilters_rer_b_by_bicycle_radius(
 
 @pytest.mark.asyncio
 async def test_explicit_station_accepts_normalized_name(app_config: AppConfig) -> None:
+    app_config.bicycle.best_station_ranges = [
+        StationRangeConfig(start="Laplace", end="Sceaux")
+    ]
     stations = await _select_bike_stations(
         app_config,
         FakeStationProvider(),

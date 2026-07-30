@@ -97,6 +97,30 @@ omitted, the planner retains the configured `candidate_stations` behavior.
 The automatic line is configured with `bicycle.target_line_id` and
 `bicycle.target_line_label`; both default to RER B.
 
+To limit `best` without treating the branched RER B as one linear sequence,
+configure any number of graph ranges:
+
+```yaml
+bicycle:
+  best_station_ranges:
+    - {start: Laplace, end: Bourg-la-Reine}
+    - {start: Bourg-la-Reine, end: Sceaux}
+```
+
+The planner takes the union of these paths before route planning. Overlapping
+stations such as Bourg-la-Reine are queried only once. The same selection can
+be overridden for one run with repeatable options:
+
+```bash
+idf-commute plan outbound --config config.yaml \
+  --depart-at 2026-07-30T08:00:00+02:00 --bike-station best \
+  --bike-station-range "Laplace..Bourg-la-Reine" \
+  --bike-station-range "Bourg-la-Reine..Sceaux"
+```
+
+Ranges can also cross the junction directly, such as `Sceaux..Antony`. The
+normal maximum-bike-time radius is still applied after the ranges are merged.
+
 Select a scoring profile per run with `--score-mode`:
 
 - `balanced` preserves the original all-factor ranking.

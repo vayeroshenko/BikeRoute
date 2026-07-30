@@ -47,6 +47,11 @@ class ProbeConfig(BaseModel):
     geovelo_average_speed_kmh: int = Field(default=16, ge=5, le=45)
 
 
+class StationRangeConfig(BaseModel):
+    start: str = Field(min_length=1)
+    end: str = Field(min_length=1)
+
+
 class BicycleConfig(BaseModel):
     profile: str = "MEDIAN"
     bike_type: str = "TRADITIONAL"
@@ -56,6 +61,7 @@ class BicycleConfig(BaseModel):
     parking_buffer_minutes: float = Field(default=4, ge=0)
     target_line_id: str = "line:IDFM:C01743"
     target_line_label: str = "RER B"
+    best_station_ranges: list[StationRangeConfig] = Field(default_factory=list)
 
 
 class WalkingConfig(BaseModel):
