@@ -1,8 +1,10 @@
 # idf-commute-planner
 
-This repository currently implements Milestones 0 and 1 only: configuration,
-secret-safe fixture capture, and an authenticated PRIM API discovery CLI. It
-does not implement the commute planner or a user interface.
+This repository currently implements Milestones 0–2: configuration,
+secret-safe fixture capture, the authenticated PRIM API discovery CLI, a
+resilient shared PRIM client, normalized domain models, and provider adapters
+for Navitia journeys, Geovelo routes, bulk disruptions, and optional SIRI Stop
+Monitoring. It does not implement the commute planner or a user interface.
 
 ## Setup
 
@@ -39,7 +41,8 @@ values, token-like fields, and sensitive URL parameters are recursively
 redacted. Review a capture before moving it into a tracked fixture directory.
 
 See [docs/api-findings.md](docs/api-findings.md) for what has and has not been
-confirmed against PRIM.
+confirmed against PRIM and [docs/milestone-2.md](docs/milestone-2.md) for the
+normalized adapter boundary.
 
 ## Offline checks
 

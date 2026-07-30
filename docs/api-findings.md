@@ -120,7 +120,9 @@ run:
 idf-commute probe stop-monitoring --config config.yaml
 ```
 
-Otherwise Milestone 1's required payloads are now observed. The exact next
-implementation step is Milestone 2: define normalized provider models and
-decode Geovelo's header-plus-positional elevation/instruction arrays against
-the reviewed fixtures before implementing planner behavior.
+Milestone 2 is now implemented against the reviewed payloads. The exact next
+implementation step is Milestone 3: implement explicit outbound
+home-to-candidate-station bicycle routing joined to exact station-to-work
+Navitia journeys, beginning with candidate filtering and the 20-minute soft /
+configurable hard bicycle thresholds. Do not add UI code before that
+orchestration and its scenario tests pass.
