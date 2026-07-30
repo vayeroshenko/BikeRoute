@@ -23,6 +23,8 @@ candidate_stations:
     assert config.timezone == "Europe/Paris"
     assert config.locations.home.navitia_coord == "2.300000;48.800000"
     assert config.line_queries == ["RER B", "4602", "21", "22"]
+    assert config.bicycle.preferred_bike_minutes == 20
+    assert config.bicycle.max_bike_minutes == 25
 
 
 def test_missing_api_key_stops_live_access(monkeypatch: pytest.MonkeyPatch) -> None:

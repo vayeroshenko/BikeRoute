@@ -23,6 +23,9 @@ class OutboundPlanningRequest(DomainModel):
     preferred_bike_minutes: float = Field(default=20, ge=0)
     max_bike_minutes: float = Field(default=25, gt=0)
     parking_buffer_minutes: float = Field(default=4, ge=0)
+    bike_profile: str = "MEDIAN"
+    bike_type: str = "TRADITIONAL"
+    bike_average_speed_kmh: int = Field(default=16, ge=5, le=45)
     max_results: int = Field(default=5, ge=1, le=20)
 
     @model_validator(mode="after")

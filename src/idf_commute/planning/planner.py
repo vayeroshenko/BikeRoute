@@ -151,7 +151,13 @@ class OutboundPlanner:
             return []
         async with self._semaphore:
             return await self._bike_router.routes(
-                BikeRequest(origin=request.home, destination=station.location)
+                BikeRequest(
+                    origin=request.home,
+                    destination=station.location,
+                    profile=request.bike_profile,
+                    bike_type=request.bike_type,
+                    average_speed_kmh=request.bike_average_speed_kmh,
+                )
             )
 
     async def _station_journeys(

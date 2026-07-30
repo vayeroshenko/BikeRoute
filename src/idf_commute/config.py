@@ -26,6 +26,7 @@ class CandidateStation(BaseModel):
     query: str
     id: str | None = None
     label: str
+    required_line_id: str | None = None
 
     @field_validator("id", mode="before")
     @classmethod
@@ -44,6 +45,15 @@ class ProbeConfig(BaseModel):
     geovelo_average_speed_kmh: int = Field(default=16, ge=5, le=45)
 
 
+class BicycleConfig(BaseModel):
+    profile: str = "MEDIAN"
+    bike_type: str = "TRADITIONAL"
+    average_speed_kmh: int = Field(default=16, ge=5, le=45)
+    preferred_bike_minutes: float = Field(default=20, ge=0)
+    max_bike_minutes: float = Field(default=25, gt=0)
+    parking_buffer_minutes: float = Field(default=4, ge=0)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -51,6 +61,7 @@ class AppConfig(BaseModel):
     locations: LocationsConfig
     candidate_stations: list[CandidateStation]
     line_queries: list[str] = Field(default_factory=lambda: ["RER B", "4602", "21", "22"])
+    bicycle: BicycleConfig = Field(default_factory=BicycleConfig)
     probe: ProbeConfig = Field(default_factory=ProbeConfig)
 
     @classmethod

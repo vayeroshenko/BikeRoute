@@ -13,6 +13,15 @@ candidate_stations:
   - query: "REPLACE WITH RER B STATION NAME"
     id: null
     label: "RER B candidate"
+    required_line_id: "line:IDFM:C01743"
+
+bicycle:
+  profile: MEDIAN
+  bike_type: TRADITIONAL
+  average_speed_kmh: 16
+  preferred_bike_minutes: 20
+  max_bike_minutes: 25
+  parking_buffer_minutes: 4
 
 line_queries:
   - "RER B"
@@ -27,4 +36,3 @@ probe:
   geovelo_profile: MEDIAN
   geovelo_bike_type: TRADITIONAL
   geovelo_average_speed_kmh: 16
-
