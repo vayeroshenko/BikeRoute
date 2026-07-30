@@ -23,6 +23,7 @@ class OutboundPlanningRequest(DomainModel):
     depart_at: AwareDatetime
     preferred_bike_minutes: float = Field(default=20, ge=0)
     max_bike_minutes: float = Field(default=25, gt=0)
+    max_walking_minutes: float = Field(default=30, gt=0)
     parking_buffer_minutes: float = Field(default=4, ge=0)
     bike_profile: str = "MEDIAN"
     bike_type: str = "TRADITIONAL"
@@ -48,6 +49,7 @@ class CandidateRejection(DomainModel):
     station_name: str | None = None
     bike_route_title: str | None = None
     bike_duration_minutes: float | None = Field(default=None, ge=0)
+    walking_duration_minutes: float | None = Field(default=None, ge=0)
     reason: str
 
 
@@ -55,6 +57,7 @@ class OutboundPlan(DomainModel):
     requested_departure: AwareDatetime
     preferred_bike_minutes: float = Field(ge=0)
     max_bike_minutes: float = Field(gt=0)
+    max_walking_minutes: float = Field(default=30, gt=0)
     candidate_station_count: int = Field(default=0, ge=0)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)

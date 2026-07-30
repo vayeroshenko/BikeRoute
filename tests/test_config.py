@@ -34,6 +34,7 @@ scoring:
     assert config.line_queries == ["RER B", "4602", "21", "22"]
     assert config.bicycle.preferred_bike_minutes == 20
     assert config.bicycle.max_bike_minutes == 25
+    assert config.walking.max_minutes == 30
     assert config.scoring.mode.value == "fewest-transfers"
     assert config.scoring.weights.transfers == 7
 

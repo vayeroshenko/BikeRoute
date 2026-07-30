@@ -33,7 +33,7 @@ from idf_commute.domain.models import (
     TransitLeg,
 )
 from idf_commute.planning.models import OutboundPlan, OutboundPlanningRequest
-from idf_commute.planning.planner import OutboundPlanner
+from idf_commute.planning.planner import OutboundPlanner, walking_duration_minutes
 from idf_commute.planning.scoring import ScoreMode, ScoreWeights, weights_for_mode
 from idf_commute.probe import (
     ProbeError,
@@ -175,6 +175,7 @@ async def _run_outbound_plan(
     config_path: Path,
     depart_at_text: str,
     max_bike_minutes: float | None,
+    max_walking_minutes: float | None,
     max_results: int,
     bike_station: str | None,
     score_mode: ScoreMode | None,
@@ -186,6 +187,10 @@ async def _run_outbound_plan(
         config.bicycle.preferred_bike_minutes,
         config.bicycle.max_bike_minutes,
         max_bike_minutes,
+    )
+    walking_limit = _effective_walking_limit(
+        config.walking.max_minutes,
+        max_walking_minutes,
     )
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
@@ -223,6 +228,7 @@ async def _run_outbound_plan(
                 depart_at=departure,
                 preferred_bike_minutes=preferred_minutes,
                 max_bike_minutes=hard_minutes,
+                max_walking_minutes=walking_limit,
                 parking_buffer_minutes=config.bicycle.parking_buffer_minutes,
                 bike_profile=config.bicycle.profile,
                 bike_type=config.bicycle.bike_type,
@@ -388,12 +394,23 @@ def _effective_bike_thresholds(
     return min(configured_preferred, maximum), maximum
 
 
+def _effective_walking_limit(
+    configured_maximum: float,
+    override_maximum: float | None,
+) -> float:
+    maximum = configured_maximum if override_maximum is None else override_maximum
+    if maximum <= 0:
+        raise ValueError("--max-walking-minutes must be greater than zero")
+    return maximum
+
+
 def _render_outbound_plan(plan: OutboundPlan) -> None:
     console.print(
         f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
         f"hard maximum {plan.max_bike_minutes:g} min"
     )
     console.print(f"Bike stations evaluated: {plan.candidate_station_count}")
+    console.print(f"Walking hard maximum: {plan.max_walking_minutes:g} min")
     console.print(
         f"Score mode: {plan.score_mode.value} "
         f"({_score_weights_summary(plan.score_weights)})"
@@ -403,6 +420,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         "Type",
         "Station",
         "Bike",
+        "Walk",
         "Transit",
         "Arrival",
         "Score",
@@ -419,6 +437,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
             "bike + transit" if option.kind is OutboundOptionKind.BIKE_TRANSIT else "all transit",
             option.station.name if option.station else "—",
             bike,
+            f"{walking_duration_minutes(option.transit_journey):.1f} min",
             _transit_summary(option.transit_journey.legs),
             option.arrival.strftime("%H:%M"),
             f"{option.score.total_minutes:.1f}",
@@ -430,16 +449,22 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
     for rank, option in enumerate(plan.options, start=1):
         _render_option_details(rank, option, plan.score_weights)
     if plan.rejections:
-        console.print(f"[yellow]{len(plan.rejections)} candidate route(s) rejected.[/yellow]")
+        console.print(f"[yellow]{len(plan.rejections)} route(s) rejected.[/yellow]")
         for rejection in plan.rejections:
-            duration = (
+            bike_duration = (
                 f", {rejection.bike_duration_minutes:.1f} min"
                 if rejection.bike_duration_minutes is not None
                 else ""
             )
+            walking_duration = (
+                f", walk {rejection.walking_duration_minutes:.1f} min"
+                if rejection.walking_duration_minutes is not None
+                else ""
+            )
             console.print(
                 f"- {rejection.station_name or rejection.station_id} / "
-                f"{rejection.bike_route_title or 'no bike route'}{duration}: "
+                f"{rejection.bike_route_title or 'no bike route'}"
+                f"{bike_duration}{walking_duration}: "
                 f"{rejection.reason}"
             )
 
@@ -461,6 +486,9 @@ def _render_option_details(
         f"Door to door: {option.departure:%H:%M} → {option.arrival:%H:%M} "
         f"({_format_duration(round((option.arrival - option.departure).total_seconds()))})"
         f"{status}"
+    )
+    console.print(
+        f"Walking total: {walking_duration_minutes(journey):.1f} min"
     )
     if journey.response_timestamp is not None:
         console.print(
@@ -657,6 +685,10 @@ def plan_outbound(
         float | None,
         typer.Option(help="Override bicycle hard limit for this run; config.yaml is unchanged."),
     ] = None,
+    max_walking_minutes: Annotated[
+        float | None,
+        typer.Option(help="Override total walking hard limit for this run."),
+    ] = None,
     max_results: Annotated[
         int,
         typer.Option(
@@ -686,6 +718,7 @@ def plan_outbound(
                 config,
                 depart_at,
                 max_bike_minutes,
+                max_walking_minutes,
                 max_results,
                 bike_station,
                 score_mode,

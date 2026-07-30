@@ -123,21 +123,59 @@ class OutboundPlanner:
                     )
                 )
                 continue
+            walkable_journeys = [
+                journey
+                for journey in viable_journeys
+                if walking_duration_minutes(journey) <= request.max_walking_minutes
+            ]
+            if not walkable_journeys:
+                shortest_walk = min(
+                    walking_duration_minutes(journey) for journey in viable_journeys
+                )
+                rejections.append(
+                    CandidateRejection(
+                        station_id=station.id,
+                        station_name=station.name,
+                        bike_route_title=route.title,
+                        bike_duration_minutes=route.duration_seconds / 60,
+                        walking_duration_minutes=shortest_walk,
+                        reason="transit journey exceeds walking hard maximum",
+                    )
+                )
+                continue
             options.extend(
                 self._bike_transit_option(
                     request, station, route, journey, disruptions
                 )
-                for journey in viable_journeys
+                for journey in walkable_journeys
             )
 
+        walkable_baselines = [
+            journey
+            for journey in baseline_journeys
+            if walking_duration_minutes(journey) <= request.max_walking_minutes
+        ]
+        if baseline_journeys and not walkable_baselines:
+            shortest_walk = min(
+                walking_duration_minutes(journey) for journey in baseline_journeys
+            )
+            rejections.append(
+                CandidateRejection(
+                    station_id="all-transit",
+                    station_name="All transit",
+                    walking_duration_minutes=shortest_walk,
+                    reason="transit journey exceeds walking hard maximum",
+                )
+            )
         options.extend(
             self._baseline_option(request, journey, disruptions)
-            for journey in baseline_journeys
+            for journey in walkable_baselines
         )
         return OutboundPlan(
             requested_departure=request.depart_at,
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
+            max_walking_minutes=request.max_walking_minutes,
             candidate_station_count=len(request.candidate_stations),
             score_mode=request.score_mode,
             score_weights=request.score_weights,
@@ -232,7 +270,6 @@ class OutboundPlanner:
             matched_disruptions=matched,
             score=score,
         )
-
     def _baseline_option(
         self,
         request: OutboundPlanningRequest,
@@ -258,3 +295,14 @@ class OutboundPlanner:
             matched_disruptions=matched,
             score=score,
         )
+
+
+def walking_duration_minutes(journey: TransitJourney) -> float:
+    return (
+        sum(
+            leg.duration_seconds
+            for leg in journey.legs
+            if leg.mode == "walking"
+        )
+        / 60
+    )

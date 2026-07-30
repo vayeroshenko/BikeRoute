@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 import idf_commute.cli as cli_module
 from idf_commute.cli import (
     _effective_bike_thresholds,
+    _effective_walking_limit,
     _parse_departure,
     _render_outbound_plan,
     _resolve_candidate_stations,
@@ -63,6 +64,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert result.exit_code == 0
     assert "--depart-at" in result.output
     assert "--max-bike-minutes" in result.output
+    assert "--max-walking-minutes" in result.output
     assert "--max-results" in result.output
     assert "--bike-station" in result.output
     assert "--score-mode" in result.output
@@ -158,6 +160,13 @@ def test_bike_limit_override_is_per_run_and_can_be_stricter_than_preference() ->
     assert _effective_bike_thresholds(20, 25, 18) == (18, 18)
     with pytest.raises(ValueError, match="greater than zero"):
         _effective_bike_thresholds(20, 25, 0)
+
+
+def test_walking_limit_override_is_per_run() -> None:
+    assert _effective_walking_limit(30, None) == 30
+    assert _effective_walking_limit(30, 12) == 12
+    with pytest.raises(ValueError, match="greater than zero"):
+        _effective_walking_limit(30, 0)
 
 
 def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(

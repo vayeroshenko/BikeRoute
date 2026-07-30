@@ -55,6 +55,7 @@ idf-commute plan outbound \
   --config config.yaml \
   --depart-at 2026-07-30T08:00:00+02:00 \
   --max-bike-minutes 25 \
+  --max-walking-minutes 20 \
   --bike-station best \
   --max-results 10
 ```
@@ -63,6 +64,12 @@ The command never relaxes the configured hard bicycle limit. Rejected routes
 show their measured duration and reason. `--max-bike-minutes` changes the hard
 limit for one run without editing `config.yaml`; for a persistent change, set
 `bicycle.max_bike_minutes` in the ignored local configuration.
+
+`--max-walking-minutes` applies a hard limit to total walking across an
+itinerary, including station access, walking transfers, and the final walk.
+It overrides `walking.max_minutes` from `config.yaml` for one run. The default
+configured limit is 30 minutes. The comparison table displays each route's
+walking total, and rejected routes report the shortest returned walking time.
 
 The comparison requests multiple Navitia journeys per origin, keeps distinct
 transit line sequences, and reserves up to 60% of the result list for
