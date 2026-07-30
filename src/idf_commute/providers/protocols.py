@@ -7,6 +7,7 @@ from idf_commute.domain.models import (
     BikeRoute,
     Departure,
     Disruption,
+    Station,
     TimeInterval,
     TransitJourney,
     TransitRequest,
@@ -27,3 +28,7 @@ class DisruptionProvider(Protocol):
 
 class DepartureProvider(Protocol):
     async def departures(self, stop_id: str, line_id: str | None = None) -> list[Departure]: ...
+
+
+class PlaceProvider(Protocol):
+    async def stations(self, query: str) -> list[Station]: ...

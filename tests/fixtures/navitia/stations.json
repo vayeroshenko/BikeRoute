@@ -1,0 +1,19 @@
+{
+  "_fixture_notice": "Synthetic place wrapper using public station metadata; no private home/work coordinates.",
+  "places": [
+    {
+      "embedded_type": "stop_area",
+      "id": "stop_area:IDFM:70033",
+      "name": "Bourg-la-Reine (Bourg-la-Reine)",
+      "stop_area": {
+        "coord": {"lat": "48.7801", "lon": "2.3125"},
+        "id": "stop_area:IDFM:70033",
+        "lines": [
+          {"code": "B", "id": "line:IDFM:C01743", "name": "B"},
+          {"code": "172", "id": "line:IDFM:C01193", "name": "172"}
+        ],
+        "name": "Bourg-la-Reine"
+      }
+    }
+  ]
+}

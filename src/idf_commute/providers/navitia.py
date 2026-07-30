@@ -7,6 +7,8 @@ from typing import Any
 from idf_commute.domain.models import (
     PARIS,
     Freshness,
+    Location,
+    Station,
     TransitJourney,
     TransitLeg,
     TransitRequest,
@@ -38,6 +40,15 @@ class NavitiaAdapter:
         response = await self._client.get_json(f"{self._base_url}/journeys", params=params)
         return normalize_navitia_journeys(response.body)
 
+    async def stations(self, query: str) -> list[Station]:
+        response = await self._client.get_json(
+            f"{self._base_url}/places",
+            params={"q": query, "type[]": "stop_area"},
+            cache_key=f"prim:places:{query.casefold()}",
+            cache_ttl_seconds=7 * 24 * 60 * 60,
+        )
+        return normalize_navitia_stations(response.body)
+
 
 def normalize_navitia_journeys(payload: Any) -> list[TransitJourney]:
     if not isinstance(payload, Mapping) or not isinstance(payload.get("journeys"), list):
@@ -52,6 +63,52 @@ def normalize_navitia_journeys(payload: Any) -> list[TransitJourney]:
             raise NavitiaSchemaError("Every journey must be an object")
         journeys.append(_normalize_journey(raw, response_timestamp))
     return journeys
+
+
+def normalize_navitia_stations(payload: Any) -> list[Station]:
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("places"), list):
+        raise NavitiaSchemaError("Expected an object containing a places array")
+    stations: list[Station] = []
+    for raw_place in payload["places"]:
+        if not isinstance(raw_place, Mapping):
+            raise NavitiaSchemaError("Every place must be an object")
+        stop_area = _mapping(raw_place.get("stop_area"))
+        if not stop_area:
+            continue
+        identifier = _required_string(
+            stop_area.get("id") or raw_place.get("id"),
+            "stop_area.id",
+        )
+        coord = _mapping(stop_area.get("coord"))
+        latitude = _coordinate(coord.get("lat"))
+        longitude = _coordinate(coord.get("lon"))
+        raw_lines = stop_area.get("lines")
+        line_ids: list[str] = []
+        if isinstance(raw_lines, list):
+            for line in raw_lines:
+                line_id = _mapping(line).get("id")
+                if isinstance(line_id, str):
+                    line_ids.append(line_id)
+        stations.append(
+            Station(
+                id=identifier,
+                name=_required_string(
+                    stop_area.get("name") or raw_place.get("name"),
+                    "stop_area.name",
+                ),
+                location=(
+                    Location(
+                        latitude=latitude,
+                        longitude=longitude,
+                        label=_optional_string(stop_area.get("name")),
+                    )
+                    if latitude is not None and longitude is not None
+                    else None
+                ),
+                line_ids=tuple(line_ids),
+            )
+        )
+    return stations
 
 
 def _normalize_journey(
@@ -194,3 +251,14 @@ def _optional_integer(value: Any, *, default: int) -> int:
     if isinstance(value, bool):
         return default
     return int(value) if isinstance(value, (int, float)) else default
+
+
+def _coordinate(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None

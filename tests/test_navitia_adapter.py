@@ -13,6 +13,7 @@ from idf_commute.providers.navitia import (
     NavitiaAdapter,
     NavitiaSchemaError,
     normalize_navitia_journeys,
+    normalize_navitia_stations,
 )
 from idf_commute.providers.prim_client import PrimClient
 
@@ -22,6 +23,10 @@ PARIS = ZoneInfo("Europe/Paris")
 
 def fixture_payload() -> object:
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+
+def station_fixture_payload() -> object:
+    return json.loads(Path("tests/fixtures/navitia/stations.json").read_text(encoding="utf-8"))
 
 
 def test_normalizes_mixed_section_freshness() -> None:
@@ -71,3 +76,32 @@ async def test_adapter_builds_arrive_by_request() -> None:
             "https://prim.test/marketplace/v2/navitia",
         ).journeys(transit_request)
     assert journeys[0].type == "best"
+
+
+def test_normalizes_station_id_coordinates_and_lines() -> None:
+    stations = normalize_navitia_stations(station_fixture_payload())
+    assert len(stations) == 1
+    station = stations[0]
+    assert station.id == "stop_area:IDFM:70033"
+    assert station.location is not None
+    assert station.location.latitude == 48.7801
+    assert station.line_ids == ("line:IDFM:C01743", "line:IDFM:C01193")
+
+
+@pytest.mark.asyncio
+async def test_adapter_resolves_station_query() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/marketplace/v2/navitia/places"
+        assert request.url.params["q"] == "Bourg-la-Reine"
+        assert request.url.params["type[]"] == "stop_area"
+        return httpx.Response(200, json=station_fixture_payload())
+
+    async with PrimClient(
+        "secret",
+        transport=httpx.MockTransport(handler),
+    ) as client:
+        stations = await NavitiaAdapter(
+            client,
+            "https://prim.test/marketplace/v2/navitia",
+        ).stations("Bourg-la-Reine")
+    assert stations[0].id == "stop_area:IDFM:70033"
