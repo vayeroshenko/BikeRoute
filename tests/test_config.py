@@ -45,6 +45,7 @@ scoring:
     assert config.walking.max_leg_minutes == 20
     assert config.scoring.mode.value == "fewest-transfers"
     assert config.scoring.weights.transfers == 7
+    assert config.state.sqlite_path == Path("data/commute.sqlite3")
 
 
 def test_missing_api_key_stops_live_access(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -18,11 +18,14 @@ from idf_commute.domain.models import (
     TransitLeg,
     TransitRequest,
 )
+from idf_commute.domain.state import BikeLocation, BikeState
 
 __all__ = [
     "BikeFacilitySegment",
+    "BikeLocation",
     "BikeRequest",
     "BikeRoute",
+    "BikeState",
     "Departure",
     "Disruption",
     "ElevationPoint",

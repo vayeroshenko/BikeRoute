@@ -6,8 +6,9 @@ resilient shared PRIM client, normalized domain models, and provider adapters
 for Navitia journeys, Geovelo routes, bulk disruptions, and optional SIRI Stop
 Monitoring. It also implements explicit outbound bike-to-station orchestration,
 hard/soft bicycle thresholds, disruption-aware ranking, an all-transit
-baseline, and terminal output. Return/round-trip bicycle state and a graphical
-UI are not implemented.
+baseline, terminal output, and local SQLite bicycle-location state.
+Route-selection confirmation, return/round-trip planning, and a graphical UI
+are not implemented.
 
 ## Setup
 
@@ -144,6 +145,30 @@ scoring:
 Available weight keys are `door_to_door`, `bike_penalty`, `transfers`,
 `disruptions`, `freshness`, and `cycling_comfort`. The CLI prints the active
 profile and every multiplier used in each score.
+
+## Bicycle location state
+
+The planner stores bicycle location in the configured local SQLite database:
+
+```yaml
+state:
+  sqlite_path: ./data/commute.sqlite3
+```
+
+Relative paths are resolved from the directory containing `config.yaml`. State
+is not changed merely by calculating a route. Inspect or explicitly correct it
+without making any network request:
+
+```bash
+idf-commute bike status --config config.yaml
+idf-commute bike set-home --config config.yaml
+idf-commute bike set-station stop_area:IDFM:70033 \
+  --name "Bourg-la-Reine" --config config.yaml
+idf-commute bike set-unknown --config config.yaml
+```
+
+An absent database means `unknown`; it does not silently assume the bicycle is
+at home. The `data/` directory remains ignored by Git.
 
 ## Offline checks
 

@@ -87,6 +87,10 @@ class ScoringConfig(BaseModel):
     weights: ScoreWeightOverrides = Field(default_factory=ScoreWeightOverrides)
 
 
+class StateConfig(BaseModel):
+    sqlite_path: Path = Path("data/commute.sqlite3")
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -97,6 +101,7 @@ class AppConfig(BaseModel):
     bicycle: BicycleConfig = Field(default_factory=BicycleConfig)
     walking: WalkingConfig = Field(default_factory=WalkingConfig)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
+    state: StateConfig = Field(default_factory=StateConfig)
     probe: ProbeConfig = Field(default_factory=ProbeConfig)
 
     @classmethod

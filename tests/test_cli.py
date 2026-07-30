@@ -60,6 +60,48 @@ candidate_stations:
     assert "<configured>" in result.output
 
 
+def test_bike_state_can_be_inspected_and_corrected_without_api_access(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+locations:
+  home: {latitude: 48.8, longitude: 2.3}
+  work: {latitude: 48.7, longitude: 2.4}
+state:
+  sqlite_path: state/commute.sqlite3
+""",
+        encoding="utf-8",
+    )
+
+    unknown = runner.invoke(app, ["bike", "status", "--config", str(config)])
+    assert unknown.exit_code == 0
+    assert "Bicycle location: unknown" in unknown.output
+    assert "no saved state" in unknown.output
+
+    parked = runner.invoke(
+        app,
+        [
+            "bike",
+            "set-station",
+            "stop_area:IDFM:70033",
+            "--name",
+            "Bourg-la-Reine",
+            "--config",
+            str(config),
+        ],
+    )
+    assert parked.exit_code == 0
+    assert "Bourg-la-Reine" in parked.output
+    assert "stop_area:IDFM:70033" in parked.output
+    assert (tmp_path / "state" / "commute.sqlite3").exists()
+
+    home = runner.invoke(app, ["bike", "set-home", "--config", str(config)])
+    assert home.exit_code == 0
+    assert "Bicycle location: home" in home.output
+
+
 def test_plan_outbound_help_is_available() -> None:
     result = runner.invoke(app, ["plan", "outbound", "--help"])
     assert result.exit_code == 0

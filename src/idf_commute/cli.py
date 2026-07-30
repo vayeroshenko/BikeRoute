@@ -4,6 +4,7 @@ import asyncio
 import html
 import math
 import re
+import sqlite3
 import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -32,6 +33,8 @@ from idf_commute.domain.models import (
     Station,
     TransitLeg,
 )
+from idf_commute.domain.state import BikeLocation, BikeState
+from idf_commute.persistence import BikeStateStore
 from idf_commute.planning.models import OutboundPlan, OutboundPlanningRequest
 from idf_commute.planning.planner import (
     OutboundPlanner,
@@ -66,12 +69,97 @@ app = typer.Typer(
 )
 probe_app = typer.Typer(help="Safely probe authenticated PRIM APIs.", no_args_is_help=True)
 plan_app = typer.Typer(help="Plan explicit bicycle and transit journeys.", no_args_is_help=True)
+bike_app = typer.Typer(help="Inspect or correct the persisted bicycle location.")
 app.add_typer(probe_app, name="probe")
 app.add_typer(plan_app, name="plan")
+app.add_typer(bike_app, name="bike")
 console = Console()
 ConfigPath = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 FixturePath = Annotated[Path, typer.Option()]
 DryRun = Annotated[bool, typer.Option(help="Validate and show redacted settings only.")]
+
+
+def _bike_state_store(config_path: Path) -> BikeStateStore:
+    config = load_config(config_path)
+    sqlite_path = config.state.sqlite_path
+    if not sqlite_path.is_absolute():
+        sqlite_path = config_path.parent / sqlite_path
+    return BikeStateStore(sqlite_path)
+
+
+def _render_bike_state(state: BikeState) -> None:
+    if state.location is BikeLocation.STATION:
+        station = state.station_name or state.station_id
+        console.print(f"Bicycle location: [bold]station[/bold] — {station}")
+        if state.station_name and state.station_id:
+            console.print(f"Station ID: {state.station_id}")
+    else:
+        console.print(f"Bicycle location: [bold]{state.location.value}[/bold]")
+    if state.updated_at is None:
+        console.print("Last updated: never (no saved state)")
+    else:
+        console.print(f"Last updated: {state.updated_at:%Y-%m-%d %H:%M:%S %Z}")
+
+
+def _run_bike_state_command(config_path: Path, action: str, **values: str | None) -> None:
+    try:
+        store = _bike_state_store(config_path)
+        if action == "status":
+            state = store.load()
+        elif action == "home":
+            state = store.set_home()
+        elif action == "station":
+            station_id = values.get("station_id")
+            if not station_id:
+                raise ValueError("station_id is required")
+            state = store.set_station(
+                station_id,
+                station_name=values.get("station_name"),
+            )
+        elif action == "unknown":
+            state = store.set_unknown()
+        else:
+            raise ValueError(f"Unsupported bicycle state action {action!r}")
+    except (FileNotFoundError, ValueError, ValidationError, sqlite3.Error) as exc:
+        console.print(f"[bold red]Bicycle state stopped:[/bold red] {exc}")
+        raise typer.Exit(code=2) from None
+    _render_bike_state(state)
+
+
+@bike_app.command("status")
+def bike_status(config: ConfigPath = Path("config.yaml")) -> None:
+    """Show where the planner currently believes the bicycle is."""
+    _run_bike_state_command(config, "status")
+
+
+@bike_app.command("set-home")
+def bike_set_home(config: ConfigPath = Path("config.yaml")) -> None:
+    """Explicitly record that the bicycle is at home."""
+    _run_bike_state_command(config, "home")
+
+
+@bike_app.command("set-station")
+def bike_set_station(
+    station_id: Annotated[str, typer.Argument(help="Stable Navitia stop-area ID.")],
+    config: ConfigPath = Path("config.yaml"),
+    station_name: Annotated[
+        str | None,
+        typer.Option("--name", help="Optional station name for human-readable status."),
+    ] = None,
+) -> None:
+    """Explicitly record that the bicycle is parked at a station."""
+    _run_bike_state_command(
+        config,
+        "station",
+        station_id=station_id,
+        station_name=station_name,
+    )
+
+
+@bike_app.command("set-unknown")
+def bike_set_unknown(config: ConfigPath = Path("config.yaml")) -> None:
+    """Clear certainty about the bicycle location."""
+    _run_bike_state_command(config, "unknown")
 
 
 async def _run_probe(

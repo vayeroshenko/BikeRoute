@@ -41,6 +41,10 @@ scoring:
   # with keys such as: {transfers: 7, disruptions: 2, freshness: 3}.
   weights: {}
 
+state:
+  # Relative paths are resolved from the directory containing this file.
+  sqlite_path: "./data/commute.sqlite3"
+
 line_queries:
   - "RER B"
   - "4602"
