@@ -324,18 +324,23 @@ async def _run_outbound_plan(
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
+    bike_state = _bike_state_store(config_path).load()
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
         timeout_seconds=settings.timeout_seconds,
     ) as client:
         navitia = NavitiaAdapter(client, str(settings.navitia_base_url))
-        stations = await _select_bike_stations(
-            config,
-            navitia,
-            bike_station,
-            hard_minutes,
-            bike_station_ranges,
+        stations = (
+            await _select_bike_stations(
+                config,
+                navitia,
+                bike_station,
+                hard_minutes,
+                bike_station_ranges,
+            )
+            if bike_state.location is BikeLocation.HOME
+            else []
         )
         planner = OutboundPlanner(
             bike_router=GeoveloAdapter(client, str(settings.geovelo_url)),
@@ -367,6 +372,7 @@ async def _run_outbound_plan(
                 max_results=max_results,
                 score_mode=active_score_mode,
                 score_weights=score_weights,
+                bike_state=bike_state,
             )
         )
 
@@ -564,6 +570,17 @@ def _effective_walking_leg_limit(
 
 
 def _render_outbound_plan(plan: OutboundPlan) -> None:
+    if plan.bike_state.location is not BikeLocation.HOME:
+        location = (
+            plan.bike_state.station_name
+            or plan.bike_state.station_id
+            or plan.bike_state.location.value
+        )
+        console.print(
+            "[yellow]Bike options suppressed:[/yellow] bicycle location is "
+            f"[bold]{location}[/bold]. Use 'idf-commute bike set-home' only "
+            "after checking that the bicycle is home."
+        )
     console.print(
         f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
         f"hard maximum {plan.max_bike_minutes:g} min"

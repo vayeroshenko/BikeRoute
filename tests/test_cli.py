@@ -34,6 +34,7 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitLeg,
 )
+from idf_commute.domain.state import BikeLocation, BikeState
 from idf_commute.persistence import BikeStateStore
 from idf_commute.planning.models import OutboundPlan
 
@@ -384,3 +385,34 @@ def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(
     assert "realtime · +2 min vs schedule" in rendered
     assert "Trains do not stop at Laplace; use bus 197 & RER B." in rendered
     assert "<p>" not in rendered
+
+
+def test_plan_output_explains_suppressed_bike_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = StringIO()
+    monkeypatch.setattr(
+        cli_module,
+        "console",
+        Console(file=output, width=180, color_system=None),
+    )
+    departure = datetime(2026, 7, 30, 8, 0, tzinfo=ZoneInfo("Europe/Paris"))
+
+    _render_outbound_plan(
+        OutboundPlan(
+            requested_departure=departure,
+            preferred_bike_minutes=20,
+            max_bike_minutes=30,
+            bike_state=BikeState(
+                location=BikeLocation.STATION,
+                station_id="stop_area:sceaux",
+                station_name="Sceaux",
+            ),
+            options=(),
+        )
+    )
+
+    rendered = output.getvalue()
+    assert "Bike options suppressed" in rendered
+    assert "bicycle location is Sceaux" in rendered
+    assert "bike set-home" in rendered

@@ -18,6 +18,7 @@ from idf_commute.domain.models import (
     TransitLeg,
     TransitRequest,
 )
+from idf_commute.domain.state import BikeLocation, BikeState
 from idf_commute.planning.models import OutboundPlanningRequest
 from idf_commute.planning.planner import OutboundPlanner
 
@@ -32,6 +33,11 @@ class FakeBikeRouter:
             BikeRoute(title="SAFER", duration_seconds=22 * 60, distance_m=5200),
             BikeRoute(title="TOO_LONG", duration_seconds=60 * 60, distance_m=15000),
         ]
+
+
+class UnexpectedBikeRouter:
+    async def routes(self, request: BikeRequest) -> list[BikeRoute]:
+        raise AssertionError(f"bike routing should have been suppressed: {request}")
 
 
 class FakeTransitRouter:
@@ -193,6 +199,39 @@ async def test_explicit_station_join_thresholds_and_baseline() -> None:
         for option in plan.options
         if option.kind is OutboundOptionKind.BIKE_TRANSIT
     )
+
+
+@pytest.mark.asyncio
+async def test_outbound_suppresses_bike_requests_when_bicycle_is_at_station() -> None:
+    parked_state = BikeState(
+        location=BikeLocation.STATION,
+        station_id="stop_area:parked",
+        station_name="Sceaux",
+    )
+    with pytest.raises(ValueError, match="require the bicycle to be at home"):
+        OutboundPlanningRequest.model_validate(
+            {
+                **planning_request().model_dump(),
+                "bike_state": parked_state,
+            }
+        )
+    request = OutboundPlanningRequest.model_validate(
+        {
+            **planning_request().model_dump(),
+            "candidate_stations": (),
+            "bike_state": parked_state,
+        }
+    )
+    plan = await OutboundPlanner(
+        bike_router=UnexpectedBikeRouter(),
+        transit_router=FakeTransitRouter(),
+        disruption_provider=FakeDisruptions(),
+    ).plan(request)
+
+    assert plan.bike_state == request.bike_state
+    assert plan.candidate_station_count == 0
+    assert len(plan.options) == 1
+    assert plan.options[0].kind is OutboundOptionKind.ALL_TRANSIT
 
 
 @pytest.mark.asyncio

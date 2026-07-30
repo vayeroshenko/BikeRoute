@@ -168,7 +168,11 @@ idf-commute bike set-unknown --config config.yaml
 ```
 
 An absent database means `unknown`; it does not silently assume the bicycle is
-at home. The `data/` directory remains ignored by Git.
+at home. When the saved location is `unknown` or a station, outbound planning
+suppresses bike-to-station candidates and their API requests, while still
+showing all-transit options. After physically checking that the bicycle is
+home, `bike set-home` enables those outbound candidates. The `data/` directory
+remains ignored by Git.
 
 Planning remains read-only unless `--confirm-rank` is supplied. To record that
 you selected a bike route from the displayed comparison, first ensure the

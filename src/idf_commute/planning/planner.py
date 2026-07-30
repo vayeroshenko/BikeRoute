@@ -186,6 +186,7 @@ class OutboundPlanner:
             candidate_station_count=len(request.candidate_stations),
             score_mode=request.score_mode,
             score_weights=request.score_weights,
+            bike_state=request.bike_state,
             options=tuple(
                 select_diverse_outbound_options(
                     options,

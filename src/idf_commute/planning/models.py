@@ -12,6 +12,7 @@ from idf_commute.domain.models import (
     Station,
     _require_aware,
 )
+from idf_commute.domain.state import BikeLocation, BikeState
 from idf_commute.planning.scoring import ScoreMode, ScoreWeights
 
 
@@ -32,14 +33,25 @@ class OutboundPlanningRequest(DomainModel):
     max_results: int = Field(default=5, ge=1, le=20)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
+    bike_state: BikeState = Field(
+        default_factory=lambda: BikeState(location=BikeLocation.HOME)
+    )
 
     @model_validator(mode="after")
     def validate_request(self) -> OutboundPlanningRequest:
         _require_aware(self.depart_at, "depart_at")
         if self.max_bike_minutes < self.preferred_bike_minutes:
             raise ValueError("max_bike_minutes must be at least preferred_bike_minutes")
-        if not self.candidate_stations:
-            raise ValueError("at least one candidate station is required")
+        if (
+            self.bike_state.location is BikeLocation.HOME
+            and not self.candidate_stations
+        ):
+            raise ValueError("at least one candidate station is required when bike is home")
+        if (
+            self.bike_state.location is not BikeLocation.HOME
+            and self.candidate_stations
+        ):
+            raise ValueError("candidate stations require the bicycle to be at home")
         if any(station.location is None for station in self.candidate_stations):
             raise ValueError("every candidate station requires coordinates")
         return self
@@ -64,6 +76,9 @@ class OutboundPlan(DomainModel):
     candidate_station_count: int = Field(default=0, ge=0)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
+    bike_state: BikeState = Field(
+        default_factory=lambda: BikeState(location=BikeLocation.HOME)
+    )
     options: tuple[OutboundOption, ...]
     rejections: tuple[CandidateRejection, ...] = ()
 
