@@ -120,9 +120,8 @@ run:
 idf-commute probe stop-monitoring --config config.yaml
 ```
 
-Milestone 2 is now implemented against the reviewed payloads. The exact next
-implementation step is Milestone 3: implement explicit outbound
-home-to-candidate-station bicycle routing joined to exact station-to-work
-Navitia journeys, beginning with candidate filtering and the 20-minute soft /
-configurable hard bicycle thresholds. Do not add UI code before that
-orchestration and its scenario tests pass.
+Milestone 3 is now implemented and live-smoke-tested. The exact next
+implementation step is Milestone 4: persist bicycle location only after route
+selection, force return transit to the stored station, and distinguish
+retrieval, detour, and explicitly leave-behind recovery options. Do not add UI
+code before bicycle-state and return scenario tests pass.

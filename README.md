@@ -1,10 +1,13 @@
 # idf-commute-planner
 
-This repository currently implements Milestones 0–2: configuration,
+This repository currently implements Milestones 0–3: configuration,
 secret-safe fixture capture, the authenticated PRIM API discovery CLI, a
 resilient shared PRIM client, normalized domain models, and provider adapters
 for Navitia journeys, Geovelo routes, bulk disruptions, and optional SIRI Stop
-Monitoring. It does not implement the commute planner or a user interface.
+Monitoring. It also implements explicit outbound bike-to-station orchestration,
+hard/soft bicycle thresholds, disruption-aware ranking, an all-transit
+baseline, and terminal output. Return/round-trip bicycle state and a graphical
+UI are not implemented.
 
 ## Setup
 
@@ -42,7 +45,19 @@ redacted. Review a capture before moving it into a tracked fixture directory.
 
 See [docs/api-findings.md](docs/api-findings.md) for what has and has not been
 confirmed against PRIM and [docs/milestone-2.md](docs/milestone-2.md) for the
-normalized adapter boundary.
+normalized adapter boundary. See [docs/milestone-3.md](docs/milestone-3.md)
+for outbound planner behavior and current live findings.
+
+## Outbound planning
+
+```bash
+idf-commute plan outbound \
+  --config config.yaml \
+  --depart-at 2026-07-30T08:00:00+02:00
+```
+
+The command never relaxes the configured hard bicycle limit. Rejected routes
+show their measured duration and reason.
 
 ## Offline checks
 
