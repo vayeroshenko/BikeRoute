@@ -95,6 +95,9 @@ class TransitLeg(DomainModel):
     destination_id: str | None = None
     origin_name: str | None = None
     destination_name: str | None = None
+    origin_location: Location | None = None
+    destination_location: Location | None = None
+    geometry: tuple[Location, ...] = ()
     disruption_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")

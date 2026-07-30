@@ -204,6 +204,9 @@ def _normalize_leg(raw: Mapping[str, Any]) -> TransitLeg:
         destination_id=_place_id(raw.get("to")),
         origin_name=_place_name(raw.get("from")),
         destination_name=_place_name(raw.get("to")),
+        origin_location=_place_location(raw.get("from")),
+        destination_location=_place_location(raw.get("to")),
+        geometry=_geojson_locations(raw.get("geojson")),
         disruption_ids=tuple(_linked_ids(raw.get("links"), "disruption")),
     )
 
@@ -278,6 +281,41 @@ def _place_name(value: Any) -> str | None:
         if nested_name:
             return nested_name
     return None
+
+
+def _place_location(value: Any) -> Location | None:
+    if not isinstance(value, Mapping):
+        return None
+    candidates = [value]
+    candidates.extend(
+        nested
+        for key in ("stop_area", "stop_point", "address")
+        if isinstance((nested := value.get(key)), Mapping)
+    )
+    for candidate in candidates:
+        coord = _mapping(candidate.get("coord"))
+        latitude = _coordinate(coord.get("lat"))
+        longitude = _coordinate(coord.get("lon"))
+        if latitude is not None and longitude is not None:
+            return Location(latitude=latitude, longitude=longitude)
+    return None
+
+
+def _geojson_locations(value: Any) -> tuple[Location, ...]:
+    coordinates = _mapping(value).get("coordinates")
+    if not isinstance(coordinates, list):
+        return ()
+    locations: list[Location] = []
+    for coordinate in coordinates:
+        if (
+            not isinstance(coordinate, list)
+            or len(coordinate) < 2
+            or (longitude := _coordinate(coordinate[0])) is None
+            or (latitude := _coordinate(coordinate[1])) is None
+        ):
+            continue
+        locations.append(Location(latitude=latitude, longitude=longitude))
+    return tuple(locations)
 
 
 def _nested_name(value: Any) -> str | None:

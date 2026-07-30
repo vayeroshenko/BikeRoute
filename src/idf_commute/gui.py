@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import pydeck as pdk  # type: ignore[import-untyped]
 import streamlit as st
 
 from idf_commute.cli import (
@@ -31,6 +32,7 @@ from idf_commute.planning.planner import (
     walking_duration_minutes,
 )
 from idf_commute.planning.scoring import ScoreMode
+from idf_commute.presentation.map import build_route_map
 
 CONFIG_ENV = "IDF_COMMUTE_CONFIG"
 
@@ -328,6 +330,7 @@ def _render_outbound(plan: OutboundPlan, config_path: Path) -> None:
         )
         with st.expander(title, expanded=rank == 1):
             _option_metrics(option)
+            _route_map(option.bike_route, option.transit_journey.legs)
             _reliability_details(option.reliability)
             if option.bike_route is not None:
                 _bike_route_details(option.bike_route)
@@ -368,6 +371,7 @@ def _render_return(plan: ReturnPlan, config_path: Path) -> None:
             expanded=rank == 1,
         ):
             _return_metrics(option)
+            _route_map(option.bike_route, option.transit_journey.legs)
             _reliability_details(option.reliability)
             _transit_details(option.transit_journey.legs)
             _bike_route_details(option.bike_route)
@@ -480,6 +484,77 @@ def _transit_details(legs: tuple[TransitLeg, ...]) -> None:
         )
     st.markdown("**Transit legs**")
     st.dataframe(rows, hide_index=True, use_container_width=True)
+
+
+def _route_map(bike_route: Any, legs: tuple[TransitLeg, ...]) -> None:
+    route_map = build_route_map(bike_route, legs)
+    if not route_map.paths:
+        st.caption("Map unavailable: route geometry was not returned by the providers.")
+        return
+    coordinates = route_map.coordinates
+    longitude = sum(point[0] for point in coordinates) / len(coordinates)
+    latitude = sum(point[1] for point in coordinates) / len(coordinates)
+    span = max(
+        max(point[0] for point in coordinates) - min(point[0] for point in coordinates),
+        max(point[1] for point in coordinates) - min(point[1] for point in coordinates),
+    )
+    zoom = 13 if span < 0.025 else 12 if span < 0.06 else 11 if span < 0.12 else 10
+    rows = [
+        {
+            "path": path.coordinates,
+            "label": path.label,
+            "color": path.color,
+            "kind": "Stop-to-stop schematic" if path.schematic else "Provider trajectory",
+        }
+        for path in route_map.paths
+    ]
+    endpoints = [
+        {"position": path.coordinates[0], "label": path.label, "kind": "Leg endpoint"}
+        for path in route_map.paths
+    ]
+    endpoints.extend(
+        {"position": path.coordinates[-1], "label": path.label, "kind": "Leg endpoint"}
+        for path in route_map.paths
+    )
+    deck = pdk.Deck(
+        map_style=pdk.map_styles.CARTO_LIGHT,
+        initial_view_state=pdk.ViewState(
+            latitude=latitude,
+            longitude=longitude,
+            zoom=zoom,
+            pitch=0,
+        ),
+        layers=[
+            pdk.Layer(
+                "PathLayer",
+                rows,
+                get_path="path",
+                get_color="color",
+                get_width=6,
+                width_min_pixels=3,
+                pickable=True,
+            ),
+            pdk.Layer(
+                "ScatterplotLayer",
+                endpoints,
+                get_position="position",
+                get_fill_color=[15, 23, 42],
+                get_radius=45,
+                radius_min_pixels=4,
+                pickable=True,
+            ),
+        ],
+        tooltip={"html": "<b>{label}</b><br>{kind}"},
+    )
+    st.markdown("**Trajectory map**")
+    st.pydeck_chart(deck, use_container_width=True)
+    st.caption("Green: bicycle · blue: public transport · grey: walking or transfer")
+    st.caption("The basemap loads CARTO tiles; trajectory data is rendered locally.")
+    if route_map.uses_schematic_segments:
+        st.caption(
+            "Some provider geometries were unavailable; those legs use a straight "
+            "stop-to-stop schematic."
+        )
 
 
 def _option_metrics(option: OutboundOption) -> None:

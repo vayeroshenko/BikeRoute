@@ -233,6 +233,8 @@ The GUI provides:
 - configured, automatic-best, specific-station, and multi-range RER B search;
 - ranked comparison tables with expandable transit legs, bicycle metrics,
   score components, freshness, and alerts;
+- interactive trajectory maps using Geovelo bicycle geometry and Navitia
+  GeoJSON, with visibly disclosed stop-to-stop fallbacks when geometry is absent;
 - visible bicycle-location state and explicit correction controls;
 - outbound and return confirmation buttons with the same state-safety checks
   as the CLI.
@@ -241,6 +243,7 @@ Opening the GUI or calculating a plan does not change bicycle state. Only an
 explicit correction or confirmation button writes to the local SQLite file.
 The API token remains in `.env`/the environment and is not displayed. The
 server binds to `127.0.0.1`, so it is not exposed to the local network.
+Map tiles are loaded from CARTO; route geometry stays in the local browser.
 
 ## Reliability assessment
 

@@ -41,11 +41,18 @@ def test_normalizes_mixed_section_freshness() -> None:
     }
     section["from"] = {
         "id": "stop_point:bourg",
-        "stop_point": {"name": "Bourg-la-Reine"},
+        "stop_point": {
+            "name": "Bourg-la-Reine",
+            "coord": {"lat": "48.7801", "lon": "2.3124"},
+        },
     }
     section["to"] = {
         "id": "stop_point:massyp",
         "stop_point": {"name": "Massy - Palaiseau"},
+    }
+    section["geojson"] = {
+        "type": "LineString",
+        "coordinates": [[2.3124, 48.7801], [2.313, 48.781]],
     }
     journeys = normalize_navitia_journeys(payload)
     assert len(journeys) == 1
@@ -63,6 +70,13 @@ def test_normalizes_mixed_section_freshness() -> None:
     assert transit_legs[0].direction == "Saint-Rémy-lès-Chevreuse"
     assert transit_legs[0].origin_name == "Bourg-la-Reine"
     assert transit_legs[0].destination_name == "Massy - Palaiseau"
+    assert transit_legs[0].origin_location == Location(
+        latitude=48.7801,
+        longitude=2.3124,
+    )
+    assert [
+        (point.longitude, point.latitude) for point in transit_legs[0].geometry
+    ] == [(2.3124, 48.7801), (2.313, 48.781)]
 
 
 def test_rejects_missing_required_journey_times() -> None:
