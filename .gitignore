@@ -1,4 +1,5 @@
 .env
+AGENTS.md
 PRIMtoken.txt
 .venv/
 __pycache__/
