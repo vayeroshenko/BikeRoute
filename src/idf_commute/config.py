@@ -60,6 +60,7 @@ class BicycleConfig(BaseModel):
 
 class WalkingConfig(BaseModel):
     max_minutes: float = Field(default=30, gt=0)
+    max_leg_minutes: float = Field(default=20, gt=0)
 
 
 class ScoreWeightOverrides(BaseModel):

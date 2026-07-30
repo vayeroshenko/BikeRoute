@@ -108,6 +108,28 @@ class LongWalkingTransitRouter(FakeTransitRouter):
         ]
 
 
+class SingleLongWalkingLegTransitRouter(FakeTransitRouter):
+    async def journeys(self, request: TransitRequest) -> list[TransitJourney]:
+        journeys = await super().journeys(request)
+        if request.origin_id != "stop_area:candidate":
+            return journeys
+        journey = journeys[0]
+        return [
+            journey.model_copy(
+                update={
+                    "legs": (
+                        TransitLeg(
+                            type="street_network",
+                            mode="walking",
+                            duration_seconds=12 * 60,
+                        ),
+                        *journey.legs,
+                    )
+                }
+            )
+        ]
+
+
 class FakeDisruptions:
     async def disruptions(
         self,
@@ -225,3 +247,33 @@ async def test_rejects_journeys_above_total_walking_limit() -> None:
     ]
     assert len(walking_rejections) == 2
     assert all(rejection.walking_duration_minutes == 31 for rejection in walking_rejections)
+
+
+@pytest.mark.asyncio
+async def test_rejects_journeys_above_single_walking_leg_limit() -> None:
+    request = planning_request().model_copy(
+        update={
+            "max_walking_minutes": 30,
+            "max_walking_leg_minutes": 10,
+        }
+    )
+    plan = await OutboundPlanner(
+        bike_router=FakeBikeRouter(),
+        transit_router=SingleLongWalkingLegTransitRouter(),
+        disruption_provider=FakeDisruptions(),
+    ).plan(request)
+
+    walking_rejections = [
+        rejection
+        for rejection in plan.rejections
+        if rejection.walking_leg_duration_minutes is not None
+    ]
+    assert len(walking_rejections) == 2
+    assert all(
+        rejection.walking_leg_duration_minutes == 12
+        for rejection in walking_rejections
+    )
+    assert all(
+        rejection.reason == "transit journey exceeds single walking leg hard maximum"
+        for rejection in walking_rejections
+    )

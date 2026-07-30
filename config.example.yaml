@@ -27,6 +27,7 @@ bicycle:
 
 walking:
   max_minutes: 30
+  max_leg_minutes: 20
 
 scoring:
   # balanced | fastest | fewest-transfers | easy-ride | reliable

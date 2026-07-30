@@ -126,20 +126,24 @@ class OutboundPlanner:
             walkable_journeys = [
                 journey
                 for journey in viable_journeys
-                if walking_duration_minutes(journey) <= request.max_walking_minutes
+                if _within_walking_limits(journey, request)
             ]
             if not walkable_journeys:
-                shortest_walk = min(
-                    walking_duration_minutes(journey) for journey in viable_journeys
+                closest = min(
+                    viable_journeys,
+                    key=lambda journey: _walking_limit_ratio(journey, request),
                 )
+                total_walk = walking_duration_minutes(closest)
+                longest_walk = longest_walking_leg_minutes(closest)
                 rejections.append(
                     CandidateRejection(
                         station_id=station.id,
                         station_name=station.name,
                         bike_route_title=route.title,
                         bike_duration_minutes=route.duration_seconds / 60,
-                        walking_duration_minutes=shortest_walk,
-                        reason="transit journey exceeds walking hard maximum",
+                        walking_duration_minutes=total_walk,
+                        walking_leg_duration_minutes=longest_walk,
+                        reason=_walking_rejection_reason(closest, request),
                     )
                 )
                 continue
@@ -153,18 +157,20 @@ class OutboundPlanner:
         walkable_baselines = [
             journey
             for journey in baseline_journeys
-            if walking_duration_minutes(journey) <= request.max_walking_minutes
+            if _within_walking_limits(journey, request)
         ]
         if baseline_journeys and not walkable_baselines:
-            shortest_walk = min(
-                walking_duration_minutes(journey) for journey in baseline_journeys
+            closest = min(
+                baseline_journeys,
+                key=lambda journey: _walking_limit_ratio(journey, request),
             )
             rejections.append(
                 CandidateRejection(
                     station_id="all-transit",
                     station_name="All transit",
-                    walking_duration_minutes=shortest_walk,
-                    reason="transit journey exceeds walking hard maximum",
+                    walking_duration_minutes=walking_duration_minutes(closest),
+                    walking_leg_duration_minutes=longest_walking_leg_minutes(closest),
+                    reason=_walking_rejection_reason(closest, request),
                 )
             )
         options.extend(
@@ -176,6 +182,7 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             max_walking_minutes=request.max_walking_minutes,
+            max_walking_leg_minutes=request.max_walking_leg_minutes,
             candidate_station_count=len(request.candidate_stations),
             score_mode=request.score_mode,
             score_weights=request.score_weights,
@@ -306,3 +313,46 @@ def walking_duration_minutes(journey: TransitJourney) -> float:
         )
         / 60
     )
+
+
+def longest_walking_leg_minutes(journey: TransitJourney) -> float:
+    return max(
+        (
+            leg.duration_seconds / 60
+            for leg in journey.legs
+            if leg.mode == "walking"
+        ),
+        default=0,
+    )
+
+
+def _within_walking_limits(
+    journey: TransitJourney,
+    request: OutboundPlanningRequest,
+) -> bool:
+    return (
+        walking_duration_minutes(journey) <= request.max_walking_minutes
+        and longest_walking_leg_minutes(journey) <= request.max_walking_leg_minutes
+    )
+
+
+def _walking_limit_ratio(
+    journey: TransitJourney,
+    request: OutboundPlanningRequest,
+) -> float:
+    return max(
+        walking_duration_minutes(journey) / request.max_walking_minutes,
+        longest_walking_leg_minutes(journey) / request.max_walking_leg_minutes,
+    )
+
+
+def _walking_rejection_reason(
+    journey: TransitJourney,
+    request: OutboundPlanningRequest,
+) -> str:
+    violations: list[str] = []
+    if walking_duration_minutes(journey) > request.max_walking_minutes:
+        violations.append("total walking")
+    if longest_walking_leg_minutes(journey) > request.max_walking_leg_minutes:
+        violations.append("single walking leg")
+    return f"transit journey exceeds {' and '.join(violations)} hard maximum"

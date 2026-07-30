@@ -56,6 +56,7 @@ idf-commute plan outbound \
   --depart-at 2026-07-30T08:00:00+02:00 \
   --max-bike-minutes 25 \
   --max-walking-minutes 20 \
+  --max-walking-leg-minutes 10 \
   --bike-station best \
   --max-results 10
 ```
@@ -70,6 +71,11 @@ itinerary, including station access, walking transfers, and the final walk.
 It overrides `walking.max_minutes` from `config.yaml` for one run. The default
 configured limit is 30 minutes. The comparison table displays each route's
 walking total, and rejected routes report the shortest returned walking time.
+
+`--max-walking-leg-minutes` separately limits every individual walking leg;
+it overrides `walking.max_leg_minutes`, which defaults to 20 minutes. This can
+reject a long station-access walk even when the itinerary's total walking limit
+is more permissive. Output displays walking as `total / longest leg`.
 
 The comparison requests multiple Navitia journeys per origin, keeps distinct
 transit line sequences, and reserves up to 60% of the result list for
