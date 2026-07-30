@@ -23,6 +23,7 @@ from idf_commute.config import (
     AppConfig,
     CandidateStation,
     MissingAccessError,
+    ReliabilityConfig,
     Settings,
     load_config,
     safe_settings_summary,
@@ -381,7 +382,7 @@ async def _run_outbound_plan(
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
-    reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
+    reliability_policy = _reliability_policy(config.reliability)
     request_limit = _effective_api_request_limit(
         config.reliability.max_requests_per_plan,
         max_api_requests,
@@ -482,7 +483,7 @@ async def _run_return_plan(
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
-    reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
+    reliability_policy = _reliability_policy(config.reliability)
     request_limit = _effective_api_request_limit(
         config.reliability.max_requests_per_plan,
         max_api_requests,
@@ -742,6 +743,13 @@ def _effective_api_request_limit(
     if maximum <= 0:
         raise ValueError("--max-api-requests must be greater than zero")
     return maximum
+
+
+def _reliability_policy(config: ReliabilityConfig) -> ReliabilityPolicy:
+    # ReliabilityConfig also owns the transport request budget. Build the
+    # narrower assessment policy from attributes so unrelated settings are not
+    # passed into its extra-forbid model.
+    return ReliabilityPolicy.model_validate(config, from_attributes=True)
 
 
 def _render_outbound_plan(plan: OutboundPlan) -> None:

@@ -16,12 +16,18 @@ from idf_commute.cli import (
     _effective_walking_leg_limit,
     _effective_walking_limit,
     _parse_departure,
+    _reliability_policy,
     _render_outbound_plan,
     _resolve_candidate_stations,
     _select_bike_stations,
     app,
 )
-from idf_commute.config import AppConfig, CandidateStation, StationRangeConfig
+from idf_commute.config import (
+    AppConfig,
+    CandidateStation,
+    ReliabilityConfig,
+    StationRangeConfig,
+)
 from idf_commute.domain.models import (
     BikeRoute,
     Disruption,
@@ -39,6 +45,18 @@ from idf_commute.persistence import BikeStateStore
 from idf_commute.planning.models import OutboundPlan
 
 runner = CliRunner()
+
+
+def test_request_budget_is_not_passed_to_reliability_policy() -> None:
+    policy = _reliability_policy(
+        ReliabilityConfig(
+            fresh_age_seconds=90,
+            max_requests_per_plan=30,
+        )
+    )
+
+    assert policy.fresh_age_seconds == 90
+    assert not hasattr(policy, "max_requests_per_plan")
 
 
 def test_dry_run_never_requires_or_prints_token(tmp_path: Path, monkeypatch: object) -> None:
