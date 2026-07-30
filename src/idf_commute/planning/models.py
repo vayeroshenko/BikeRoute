@@ -12,6 +12,7 @@ from idf_commute.domain.models import (
     Station,
     _require_aware,
 )
+from idf_commute.planning.scoring import ScoreMode, ScoreWeights
 
 
 class OutboundPlanningRequest(DomainModel):
@@ -27,6 +28,8 @@ class OutboundPlanningRequest(DomainModel):
     bike_type: str = "TRADITIONAL"
     bike_average_speed_kmh: int = Field(default=16, ge=5, le=45)
     max_results: int = Field(default=5, ge=1, le=20)
+    score_mode: ScoreMode = ScoreMode.BALANCED
+    score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
 
     @model_validator(mode="after")
     def validate_request(self) -> OutboundPlanningRequest:
@@ -53,6 +56,8 @@ class OutboundPlan(DomainModel):
     preferred_bike_minutes: float = Field(ge=0)
     max_bike_minutes: float = Field(gt=0)
     candidate_station_count: int = Field(default=0, ge=0)
+    score_mode: ScoreMode = ScoreMode.BALANCED
+    score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
     options: tuple[OutboundOption, ...]
     rejections: tuple[CandidateRejection, ...] = ()
 

@@ -139,6 +139,8 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             candidate_station_count=len(request.candidate_stations),
+            score_mode=request.score_mode,
+            score_weights=request.score_weights,
             options=tuple(
                 select_diverse_outbound_options(
                     options,
@@ -217,6 +219,7 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             disruption_penalty_minutes=disruption_penalty_minutes(matched),
+            weights=request.score_weights,
         )
         return OutboundOption(
             kind=OutboundOptionKind.BIKE_TRANSIT,
@@ -245,6 +248,7 @@ class OutboundPlanner:
             preferred_bike_minutes=request.preferred_bike_minutes,
             max_bike_minutes=request.max_bike_minutes,
             disruption_penalty_minutes=disruption_penalty_minutes(matched),
+            weights=request.score_weights,
         )
         return OutboundOption(
             kind=OutboundOptionKind.ALL_TRANSIT,

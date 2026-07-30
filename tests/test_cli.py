@@ -65,6 +65,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--max-bike-minutes" in result.output
     assert "--max-results" in result.output
     assert "--bike-station" in result.output
+    assert "--score-mode" in result.output
 
 
 def test_naive_departure_uses_configured_timezone() -> None:

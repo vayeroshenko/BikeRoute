@@ -34,6 +34,7 @@ from idf_commute.domain.models import (
 )
 from idf_commute.planning.models import OutboundPlan, OutboundPlanningRequest
 from idf_commute.planning.planner import OutboundPlanner
+from idf_commute.planning.scoring import ScoreMode, ScoreWeights, weights_for_mode
 from idf_commute.probe import (
     ProbeError,
     ProbeResult,
@@ -176,6 +177,7 @@ async def _run_outbound_plan(
     max_bike_minutes: float | None,
     max_results: int,
     bike_station: str | None,
+    score_mode: ScoreMode | None,
 ) -> OutboundPlan:
     config = load_config(config_path)
     settings = Settings()
@@ -185,6 +187,9 @@ async def _run_outbound_plan(
         config.bicycle.max_bike_minutes,
         max_bike_minutes,
     )
+    active_score_mode = score_mode or config.scoring.mode
+    score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
+    score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
@@ -223,6 +228,8 @@ async def _run_outbound_plan(
                 bike_type=config.bicycle.bike_type,
                 bike_average_speed_kmh=config.bicycle.average_speed_kmh,
                 max_results=max_results,
+                score_mode=active_score_mode,
+                score_weights=score_weights,
             )
         )
 
@@ -387,6 +394,10 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         f"hard maximum {plan.max_bike_minutes:g} min"
     )
     console.print(f"Bike stations evaluated: {plan.candidate_station_count}")
+    console.print(
+        f"Score mode: {plan.score_mode.value} "
+        f"({_score_weights_summary(plan.score_weights)})"
+    )
     table = Table(
         "Rank",
         "Type",
@@ -417,7 +428,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
     if plan.options:
         console.print("\n[bold]Detailed itineraries[/bold]")
     for rank, option in enumerate(plan.options, start=1):
-        _render_option_details(rank, option)
+        _render_option_details(rank, option, plan.score_weights)
     if plan.rejections:
         console.print(f"[yellow]{len(plan.rejections)} candidate route(s) rejected.[/yellow]")
         for rejection in plan.rejections:
@@ -433,7 +444,11 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
             )
 
 
-def _render_option_details(rank: int, option: OutboundOption) -> None:
+def _render_option_details(
+    rank: int,
+    option: OutboundOption,
+    weights: ScoreWeights,
+) -> None:
     journey = option.transit_journey
     kind = (
         f"bike to {option.station.name}"
@@ -457,12 +472,14 @@ def _render_option_details(rank: int, option: OutboundOption) -> None:
     _render_transit_legs(journey.legs)
     score = option.score
     console.print(
-        f"Score {score.total_minutes:.1f}: door {score.door_to_door_minutes:.1f} + "
-        f"bike {score.bike_penalty_minutes:.1f} + "
-        f"transfers {score.transfer_penalty_minutes:.1f} + "
-        f"alerts {score.disruption_penalty_minutes:.1f} + "
-        f"freshness {score.freshness_penalty_minutes:.1f} + "
-        f"comfort {score.cycling_comfort_penalty_minutes:.1f}"
+        f"Score {score.total_minutes:.1f}: "
+        f"door {score.door_to_door_minutes:.1f}x{weights.door_to_door:g} + "
+        f"bike {score.bike_penalty_minutes:.1f}x{weights.bike_penalty:g} + "
+        f"transfers {score.transfer_penalty_minutes:.1f}x{weights.transfers:g} + "
+        f"alerts {score.disruption_penalty_minutes:.1f}x{weights.disruptions:g} + "
+        f"freshness {score.freshness_penalty_minutes:.1f}x{weights.freshness:g} + "
+        f"comfort {score.cycling_comfort_penalty_minutes:.1f}x"
+        f"{weights.cycling_comfort:g}"
     )
     displayed_alerts: set[tuple[str, str]] = set()
     for disruption in option.matched_disruptions:
@@ -621,6 +638,14 @@ def _clean_alert_message(value: str, limit: int = 700) -> str:
     return f"{cleaned[: limit - 1].rstrip()}…"
 
 
+def _score_weights_summary(weights: ScoreWeights) -> str:
+    return (
+        f"door x{weights.door_to_door:g}, bike x{weights.bike_penalty:g}, "
+        f"transfers x{weights.transfers:g}, alerts x{weights.disruptions:g}, "
+        f"freshness x{weights.freshness:g}, comfort x{weights.cycling_comfort:g}"
+    )
+
+
 @plan_app.command("outbound")
 def plan_outbound(
     depart_at: Annotated[
@@ -649,6 +674,10 @@ def plan_outbound(
             )
         ),
     ] = None,
+    score_mode: Annotated[
+        ScoreMode | None,
+        typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
+    ] = None,
 ) -> None:
     """Plan bike-to-station plus transit options and an all-transit baseline."""
     try:
@@ -659,6 +688,7 @@ def plan_outbound(
                 max_bike_minutes,
                 max_results,
                 bike_station,
+                score_mode,
             )
         )
     except (

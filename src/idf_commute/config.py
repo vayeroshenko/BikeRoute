@@ -7,6 +7,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from idf_commute.planning.scoring import ScoreMode
+
 
 class LocationConfig(BaseModel):
     latitude: float
@@ -56,6 +58,24 @@ class BicycleConfig(BaseModel):
     target_line_label: str = "RER B"
 
 
+class ScoreWeightOverrides(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    door_to_door: float | None = Field(default=None, ge=0)
+    bike_penalty: float | None = Field(default=None, ge=0)
+    transfers: float | None = Field(default=None, ge=0)
+    disruptions: float | None = Field(default=None, ge=0)
+    freshness: float | None = Field(default=None, ge=0)
+    cycling_comfort: float | None = Field(default=None, ge=0)
+
+
+class ScoringConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: ScoreMode = ScoreMode.BALANCED
+    weights: ScoreWeightOverrides = Field(default_factory=ScoreWeightOverrides)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -64,6 +84,7 @@ class AppConfig(BaseModel):
     candidate_stations: list[CandidateStation] = Field(default_factory=list)
     line_queries: list[str] = Field(default_factory=lambda: ["RER B", "4602", "21", "22"])
     bicycle: BicycleConfig = Field(default_factory=BicycleConfig)
+    scoring: ScoringConfig = Field(default_factory=ScoringConfig)
     probe: ProbeConfig = Field(default_factory=ProbeConfig)
 
     @classmethod

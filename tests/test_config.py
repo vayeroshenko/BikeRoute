@@ -7,6 +7,11 @@ import pytest
 from idf_commute.config import AppConfig, MissingAccessError, Settings
 
 
+def test_example_config_is_valid() -> None:
+    config = AppConfig.from_yaml(Path("config.example.yaml"))
+    assert config.scoring.mode.value == "balanced"
+
+
 def test_yaml_config_loads(tmp_path: Path) -> None:
     path = tmp_path / "config.yaml"
     path.write_text(
@@ -16,6 +21,10 @@ locations:
   work: {latitude: 48.7, longitude: 2.4}
 candidate_stations:
   - {query: Example, id: null, label: Example}
+scoring:
+  mode: fewest-transfers
+  weights:
+    transfers: 7
 """,
         encoding="utf-8",
     )
@@ -25,6 +34,8 @@ candidate_stations:
     assert config.line_queries == ["RER B", "4602", "21", "22"]
     assert config.bicycle.preferred_bike_minutes == 20
     assert config.bicycle.max_bike_minutes == 25
+    assert config.scoring.mode.value == "fewest-transfers"
+    assert config.scoring.weights.transfers == 7
 
 
 def test_missing_api_key_stops_live_access(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -12,7 +12,12 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitLeg,
 )
-from idf_commute.planning.scoring import bike_penalty_minutes, score_outbound
+from idf_commute.planning.scoring import (
+    ScoreMode,
+    bike_penalty_minutes,
+    score_outbound,
+    weights_for_mode,
+)
 
 PARIS = ZoneInfo("Europe/Paris")
 
@@ -79,3 +84,28 @@ def test_score_rejects_route_above_hard_limit() -> None:
             preferred_bike_minutes=20,
             max_bike_minutes=25,
         )
+
+
+def test_fastest_mode_scores_only_door_to_door_time() -> None:
+    departure = datetime(2026, 7, 30, 8, 0, tzinfo=PARIS)
+    score = score_outbound(
+        departure=departure,
+        arrival=departure + timedelta(minutes=55),
+        transit_journey=transit_journey(departure + timedelta(minutes=20)),
+        bike_route=bike_route(22, discouraged_m=1000),
+        preferred_bike_minutes=20,
+        max_bike_minutes=25,
+        disruption_penalty_minutes=12,
+        weights=weights_for_mode(ScoreMode.FASTEST),
+    )
+    assert score.total_minutes == 55
+
+
+def test_mode_weights_accept_explicit_overrides() -> None:
+    weights = weights_for_mode(
+        ScoreMode.FEWEST_TRANSFERS,
+        {"transfers": 7, "door_to_door": 0.5},
+    )
+    assert weights.transfers == 7
+    assert weights.door_to_door == 0.5
+    assert weights.disruptions == 1

@@ -84,6 +84,30 @@ omitted, the planner retains the configured `candidate_stations` behavior.
 The automatic line is configured with `bicycle.target_line_id` and
 `bicycle.target_line_label`; both default to RER B.
 
+Select a scoring profile per run with `--score-mode`:
+
+- `balanced` preserves the original all-factor ranking.
+- `fastest` ranks by door-to-door time only.
+- `fewest-transfers` strongly penalizes transfers.
+- `easy-ride` emphasizes bicycle duration and cycling comfort.
+- `reliable` emphasizes disruptions, schedule-only data, and transfers.
+
+Set the default with `scoring.mode` in `config.yaml`. Individual non-negative
+multipliers under `scoring.weights` override the selected preset:
+
+```yaml
+scoring:
+  mode: reliable
+  weights:
+    transfers: 2
+    disruptions: 4
+    freshness: 3
+```
+
+Available weight keys are `door_to_door`, `bike_penalty`, `transfers`,
+`disruptions`, `freshness`, and `cycling_comfort`. The CLI prints the active
+profile and every multiplier used in each score.
+
 ## Offline checks
 
 ```bash
