@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import html
 import math
+import os
 import re
 import sqlite3
+import subprocess
+import sys
 import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -83,6 +86,29 @@ console = Console()
 ConfigPath = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 FixturePath = Annotated[Path, typer.Option()]
 DryRun = Annotated[bool, typer.Option(help="Validate and show redacted settings only.")]
+
+
+@app.command("gui")
+def launch_gui(config: ConfigPath = Path("config.yaml")) -> None:
+    """Open the local Streamlit planning interface."""
+    environment = os.environ.copy()
+    environment["IDF_COMMUTE_CONFIG"] = str(config.resolve())
+    gui_path = Path(__file__).with_name("gui.py")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(gui_path),
+            "--server.headless=false",
+            "--server.address=127.0.0.1",
+        ],
+        env=environment,
+        check=False,
+    )
+    if result.returncode:
+        raise typer.Exit(code=result.returncode)
 
 
 def _bike_state_store(config_path: Path) -> BikeStateStore:

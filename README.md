@@ -8,7 +8,8 @@ Monitoring. It also implements explicit outbound bike-to-station orchestration,
 hard/soft bicycle thresholds, disruption-aware ranking, an all-transit
 baseline, terminal output, and local SQLite bicycle-location state.
 Outbound/return route confirmation and exact-station return planning are also
-implemented. Round-trip ranking and a graphical UI are not implemented.
+implemented, together with a local graphical interface. Round-trip ranking is
+intentionally deferred.
 
 ## Setup
 
@@ -215,6 +216,31 @@ idf-commute plan return --config config.yaml \
 Confirmation records the bicycle at home only if the stored station still
 matches the selected return. A changed or stale state is rejected rather than
 silently moving the bicycle.
+
+## Local graphical interface
+
+Launch the Streamlit interface with:
+
+```bash
+idf-commute gui --config config.yaml
+```
+
+The GUI provides:
+
+- outbound and exact-station return planning;
+- departure date/time, bicycle and walking limits, result count, and scoring
+  mode controls;
+- configured, automatic-best, specific-station, and multi-range RER B search;
+- ranked comparison tables with expandable transit legs, bicycle metrics,
+  score components, freshness, and alerts;
+- visible bicycle-location state and explicit correction controls;
+- outbound and return confirmation buttons with the same state-safety checks
+  as the CLI.
+
+Opening the GUI or calculating a plan does not change bicycle state. Only an
+explicit correction or confirmation button writes to the local SQLite file.
+The API token remains in `.env`/the environment and is not displayed. The
+server binds to `127.0.0.1`, so it is not exposed to the local network.
 
 ## Offline checks
 
