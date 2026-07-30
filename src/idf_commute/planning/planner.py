@@ -14,6 +14,7 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitRequest,
 )
+from idf_commute.planning.deduplicate import deduplicate_outbound_options
 from idf_commute.planning.disruptions import (
     disruption_penalty_minutes,
     match_journey_disruptions,
@@ -132,7 +133,12 @@ class OutboundPlanner:
         options.sort(key=lambda option: option.score.total_minutes)
         return OutboundPlan(
             requested_departure=request.depart_at,
-            options=tuple(options[: request.max_results]),
+            options=tuple(
+                deduplicate_outbound_options(
+                    options,
+                    limit=request.max_results,
+                )
+            ),
             rejections=tuple(rejections),
         )
 
