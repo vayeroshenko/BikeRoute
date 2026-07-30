@@ -133,6 +133,8 @@ def _application_periods(value: Any) -> list[TimeInterval]:
         end = _parse_datetime(raw.get("end"), required=True)
         if begin is None or end is None:
             raise DisruptionSchemaError("Application period timestamps are required")
+        if end <= begin:
+            continue
         periods.append(TimeInterval(begin=begin, end=end))
     return periods
 

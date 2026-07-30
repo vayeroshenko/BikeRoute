@@ -48,6 +48,16 @@ def test_rejects_missing_bulk_collections() -> None:
         normalize_bulk_disruptions({"disruptions": []})
 
 
+def test_invalid_application_period_does_not_abort_feed() -> None:
+    payload = fixture_payload()
+    payload["disruptions"][0]["applicationPeriods"].append(
+        {"begin": "20260730T080000", "end": "20260730T080000"}
+    )
+    disruptions = normalize_bulk_disruptions(payload)
+    assert len(disruptions) == 1
+    assert len(disruptions[0].application_periods) == 1
+
+
 @pytest.mark.asyncio
 async def test_adapter_uses_short_cache_hook_contract() -> None:
     requests = 0
