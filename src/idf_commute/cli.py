@@ -451,8 +451,12 @@ def _leg_times(leg: TransitLeg) -> str:
 
 def _leg_step(leg: TransitLeg) -> str:
     if leg.type == "public_transport":
-        line = " ".join(part for part in (leg.commercial_mode, leg.line_code) if part)
-        direction = f" → {leg.direction}" if leg.direction else ""
+        line = _leg_line_label(leg)
+        direction = (
+            f" → {leg.direction}"
+            if leg.direction and len(leg.equivalent_line_codes) <= 1
+            else ""
+        )
         return f"{line or 'Transit'}{direction}"
     labels = {
         "crow_fly": "Station access",
@@ -466,13 +470,17 @@ def _leg_step(leg: TransitLeg) -> str:
 
 def _transit_summary(legs: tuple[TransitLeg, ...]) -> str:
     labels = [
-        " ".join(part for part in (leg.commercial_mode, leg.line_code) if part)
-        or leg.line_id
-        or "transit"
+        _leg_line_label(leg) or leg.line_id or "transit"
         for leg in legs
         if leg.type == "public_transport"
     ]
     return " → ".join(labels) or "—"
+
+
+def _leg_line_label(leg: TransitLeg) -> str:
+    codes = leg.equivalent_line_codes or ((leg.line_code,) if leg.line_code else ())
+    code_label = " / ".join(codes)
+    return " ".join(part for part in (leg.commercial_mode, code_label) if part)
 
 
 def _leg_data(leg: TransitLeg) -> str:

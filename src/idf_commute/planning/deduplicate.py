@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from idf_commute.domain.models import OutboundOption, OutboundOptionKind
+from idf_commute.domain.models import (
+    OutboundOption,
+    OutboundOptionKind,
+    TransitLeg,
+)
 
 
 def deduplicate_outbound_options(
@@ -10,17 +14,14 @@ def deduplicate_outbound_options(
 ) -> list[OutboundOption]:
     if limit < 1:
         raise ValueError("limit must be at least 1")
-    unique: list[OutboundOption] = []
-    seen: set[tuple[object, ...]] = set()
-    for option in options:
+    grouped: dict[tuple[object, ...], OutboundOption] = {}
+    for option in sorted(options, key=lambda candidate: candidate.score.total_minutes):
         signature = outbound_option_signature(option)
-        if signature in seen:
-            continue
-        seen.add(signature)
-        unique.append(option)
-        if len(unique) == limit:
-            break
-    return unique
+        fastest = grouped.get(signature)
+        grouped[signature] = (
+            option if fastest is None else _merge_equivalent_line_codes(fastest, option)
+        )
+    return list(grouped.values())[:limit]
 
 
 def select_diverse_outbound_options(
@@ -54,7 +55,7 @@ def outbound_option_signature(option: OutboundOption) -> tuple[object, ...]:
         (
             leg.type,
             leg.mode,
-            leg.line_id,
+            _transport_kind(leg),
             leg.origin_id,
             leg.destination_id,
         )
@@ -66,3 +67,41 @@ def outbound_option_signature(option: OutboundOption) -> tuple[object, ...]:
         option.bike_route.title if option.bike_route else None,
         transit_signature,
     )
+
+
+def _transport_kind(leg: TransitLeg) -> str | None:
+    if leg.type != "public_transport":
+        return None
+    return leg.commercial_mode.casefold() if leg.commercial_mode else leg.line_id
+
+
+def _merge_equivalent_line_codes(
+    fastest: OutboundOption,
+    alternative: OutboundOption,
+) -> OutboundOption:
+    merged_legs = tuple(
+        _merge_leg_line_codes(fastest_leg, alternative_leg)
+        for fastest_leg, alternative_leg in zip(
+            fastest.transit_journey.legs,
+            alternative.transit_journey.legs,
+            strict=True,
+        )
+    )
+    journey = fastest.transit_journey.model_copy(update={"legs": merged_legs})
+    return fastest.model_copy(update={"transit_journey": journey})
+
+
+def _merge_leg_line_codes(fastest: TransitLeg, alternative: TransitLeg) -> TransitLeg:
+    if fastest.type != "public_transport":
+        return fastest
+    codes = {
+        code
+        for code in (
+            *fastest.equivalent_line_codes,
+            fastest.line_code,
+            *alternative.equivalent_line_codes,
+            alternative.line_code,
+        )
+        if code
+    }
+    return fastest.model_copy(update={"equivalent_line_codes": tuple(sorted(codes))})

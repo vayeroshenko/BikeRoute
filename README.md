@@ -71,6 +71,10 @@ defaults to 10. Each ranked result includes its full leg sequence, stop names,
 waits, transfers, realtime/base-schedule status, bicycle metrics, and cleaned
 disruption notices.
 
+Interchangeable services of the same transport type between the same two stops
+are grouped into one itinerary (for example, `Bus 4602 / 4621 / 4622`). The
+displayed times and score come from the fastest member of the group.
+
 ## Offline checks
 
 ```bash

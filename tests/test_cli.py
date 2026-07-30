@@ -149,6 +149,7 @@ def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(
                 freshness=Freshness.REALTIME,
                 commercial_mode="Bus",
                 line_code="197",
+                equivalent_line_codes=("197", "197B"),
                 direction="Bourg-la-Reine",
                 origin_name="Laplace RER",
                 destination_name="Bourg-la-Reine RER",
@@ -204,8 +205,8 @@ def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(
 
     rendered = output.getvalue()
     assert "Bike RECOMMENDED: 5.6 km in 21 min" in rendered
-    assert "Bus 197" in rendered
-    assert "Bus 197 → Bourg-la-Reine" in rendered
+    assert "Bus 197 / 197B" in rendered
+    assert "Bus 197 / 197B → Bourg-la-Reine" not in rendered
     assert "Laplace RER → Bourg-la-Reine RER" in rendered
     assert "realtime · +2 min vs schedule" in rendered
     assert "Trains do not stop at Laplace; use bus 197 & RER B." in rendered

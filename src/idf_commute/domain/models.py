@@ -82,6 +82,7 @@ class TransitLeg(DomainModel):
     freshness: Freshness = Freshness.UNKNOWN
     line_id: str | None = None
     line_code: str | None = None
+    equivalent_line_codes: tuple[str, ...] = ()
     commercial_mode: str | None = None
     direction: str | None = None
     origin_id: str | None = None
