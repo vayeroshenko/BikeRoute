@@ -21,6 +21,11 @@ class Freshness(StrEnum):
     UNKNOWN = "unknown"
 
 
+class OutboundOptionKind(StrEnum):
+    BIKE_TRANSIT = "bike_transit"
+    ALL_TRANSIT = "all_transit"
+
+
 class Location(DomainModel):
     latitude: float = Field(ge=48.0, le=49.5)
     longitude: float = Field(ge=1.0, le=3.7)
@@ -199,6 +204,41 @@ class Departure(DomainModel):
             value = getattr(self, field_name)
             if value is not None:
                 _require_aware(value, field_name)
+        return self
+
+
+class ScoreBreakdown(DomainModel):
+    door_to_door_minutes: float = Field(ge=0)
+    bike_penalty_minutes: float = Field(ge=0)
+    transfer_penalty_minutes: float = Field(ge=0)
+    disruption_penalty_minutes: float = Field(ge=0)
+    freshness_penalty_minutes: float = Field(ge=0)
+    cycling_comfort_penalty_minutes: float = Field(ge=0)
+    total_minutes: float = Field(ge=0)
+
+
+class OutboundOption(DomainModel):
+    kind: OutboundOptionKind
+    station: Station | None = None
+    bike_route: BikeRoute | None = None
+    transit_journey: TransitJourney
+    departure: AwareDatetime
+    arrival: AwareDatetime
+    parking_buffer_seconds: int = Field(default=0, ge=0)
+    matched_disruptions: tuple[Disruption, ...] = ()
+    score: ScoreBreakdown
+
+    @model_validator(mode="after")
+    def validate_option(self) -> OutboundOption:
+        _require_aware(self.departure, "departure")
+        _require_aware(self.arrival, "arrival")
+        if self.arrival < self.departure:
+            raise ValueError("arrival must not precede departure")
+        if self.kind is OutboundOptionKind.BIKE_TRANSIT:
+            if self.station is None or self.bike_route is None:
+                raise ValueError("bike-transit options require a station and bike route")
+        elif self.station is not None or self.bike_route is not None:
+            raise ValueError("all-transit options cannot contain a bike route or station")
         return self
 
 
