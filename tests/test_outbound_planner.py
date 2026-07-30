@@ -199,6 +199,12 @@ async def test_explicit_station_join_thresholds_and_baseline() -> None:
         for option in plan.options
         if option.kind is OutboundOptionKind.BIKE_TRANSIT
     )
+    assert all(option.reliability is not None for option in plan.options)
+    assert all(
+        option.reliability
+        and option.reliability.robust_arrival == option.arrival + timedelta(minutes=10)
+        for option in plan.options
+    )
 
 
 @pytest.mark.asyncio

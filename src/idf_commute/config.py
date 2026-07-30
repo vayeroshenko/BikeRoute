@@ -91,6 +91,13 @@ class StateConfig(BaseModel):
     sqlite_path: Path = Path("data/commute.sqlite3")
 
 
+class ReliabilityConfig(BaseModel):
+    fresh_age_seconds: float = Field(default=120, gt=0)
+    stale_age_seconds: float = Field(default=300, gt=0)
+    medium_buffer_minutes: float = Field(default=5, ge=0)
+    low_buffer_minutes: float = Field(default=10, ge=0)
+
+
 class AppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -102,6 +109,7 @@ class AppConfig(BaseModel):
     walking: WalkingConfig = Field(default_factory=WalkingConfig)
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
     state: StateConfig = Field(default_factory=StateConfig)
+    reliability: ReliabilityConfig = Field(default_factory=ReliabilityConfig)
     probe: ProbeConfig = Field(default_factory=ProbeConfig)
 
     @classmethod

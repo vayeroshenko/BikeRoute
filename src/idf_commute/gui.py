@@ -18,7 +18,12 @@ from idf_commute.cli import (
     _run_return_plan,
 )
 from idf_commute.config import AppConfig, load_config
-from idf_commute.domain.models import OutboundOption, OutboundOptionKind, TransitLeg
+from idf_commute.domain.models import (
+    OutboundOption,
+    OutboundOptionKind,
+    ReliabilityAssessment,
+    TransitLeg,
+)
 from idf_commute.domain.state import BikeLocation, BikeState
 from idf_commute.planning.models import OutboundPlan, ReturnOption, ReturnPlan
 from idf_commute.planning.planner import (
@@ -305,6 +310,7 @@ def _render_outbound(plan: OutboundPlan, config_path: Path) -> None:
         )
         with st.expander(title, expanded=rank == 1):
             _option_metrics(option)
+            _reliability_details(option.reliability)
             if option.bike_route is not None:
                 _bike_route_details(option.bike_route)
             _transit_details(option.transit_journey.legs)
@@ -340,6 +346,7 @@ def _render_return(plan: ReturnPlan, config_path: Path) -> None:
             expanded=rank == 1,
         ):
             _return_metrics(option)
+            _reliability_details(option.reliability)
             _transit_details(option.transit_journey.legs)
             _bike_route_details(option.bike_route)
             _score_details(option.score)
@@ -378,6 +385,16 @@ def outbound_summary_rows(plan: OutboundPlan) -> list[dict[str, Any]]:
                 "Transit": _transit_label(option.transit_journey.legs),
                 "Walking": (f"{walking_duration_minutes(option.transit_journey):.0f} min"),
                 "Arrival": option.arrival.strftime("%H:%M"),
+                "Robust arrival": (
+                    option.reliability.robust_arrival.strftime("%H:%M")
+                    if option.reliability
+                    else "—"
+                ),
+                "Confidence": (
+                    option.reliability.confidence.value.title()
+                    if option.reliability
+                    else "Unknown"
+                ),
                 "Score": round(option.score.total_minutes, 1),
                 "Alerts": len(option.matched_disruptions),
             }
@@ -395,6 +412,16 @@ def return_summary_rows(plan: ReturnPlan) -> list[dict[str, Any]]:
                 f"{option.bike_route.duration_seconds / 60:.0f} min · {option.bike_route.title}"
             ),
             "Home": option.arrival.strftime("%H:%M"),
+            "Robust home": (
+                option.reliability.robust_arrival.strftime("%H:%M")
+                if option.reliability
+                else "—"
+            ),
+            "Confidence": (
+                option.reliability.confidence.value.title()
+                if option.reliability
+                else "Unknown"
+            ),
             "Score": round(option.score.total_minutes, 1),
             "Alerts": len(option.matched_disruptions),
         }
@@ -465,6 +492,24 @@ def _bike_route_details(route: Any) -> None:
             f"Recommended roads {route.recommended_roads_m / route.distance_m:.0%} · "
             f"discouraged {route.discouraged_roads_m / route.distance_m:.0%}"
         )
+
+
+def _reliability_details(reliability: ReliabilityAssessment | None) -> None:
+    if reliability is None:
+        st.caption("Confidence unavailable")
+        return
+    age = (
+        f"{reliability.data_age_seconds / 60:.1f} min"
+        if reliability.data_age_seconds is not None
+        else "unknown"
+    )
+    st.markdown(
+        f"**Confidence: {reliability.confidence.value.title()}** · "
+        f"provider data age {age} · "
+        f"robust arrival **{reliability.robust_arrival:%H:%M}**"
+    )
+    for reason in reliability.reasons:
+        st.caption(f"• {reason}")
 
 
 def _score_details(score: Any) -> None:

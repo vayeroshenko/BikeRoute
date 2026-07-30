@@ -33,6 +33,7 @@ from idf_commute.domain.models import (
     Location,
     OutboundOption,
     OutboundOptionKind,
+    ReliabilityAssessment,
     Station,
     TransitLeg,
 )
@@ -50,6 +51,7 @@ from idf_commute.planning.planner import (
     longest_walking_leg_minutes,
     walking_duration_minutes,
 )
+from idf_commute.planning.reliability import ReliabilityPolicy
 from idf_commute.planning.scoring import ScoreMode, ScoreWeights, weights_for_mode
 from idf_commute.planning.stations import (
     parse_station_range,
@@ -378,6 +380,7 @@ async def _run_outbound_plan(
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
+    reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
     bike_state = _bike_state_store(config_path).load()
     async with PrimClient(
         settings.require_api_key(),
@@ -426,6 +429,7 @@ async def _run_outbound_plan(
                 max_results=max_results,
                 score_mode=active_score_mode,
                 score_weights=score_weights,
+                reliability_policy=reliability_policy,
                 bike_state=bike_state,
             )
         )
@@ -465,6 +469,7 @@ async def _run_return_plan(
     active_score_mode = score_mode or config.scoring.mode
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
+    reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
@@ -508,6 +513,7 @@ async def _run_return_plan(
                 max_results=max_results,
                 score_mode=active_score_mode,
                 score_weights=score_weights,
+                reliability_policy=reliability_policy,
             )
         )
 
@@ -737,6 +743,7 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         "Walk total/max",
         "Transit",
         "Arrival",
+        "Confidence",
         "Score",
         "Alerts",
     )
@@ -755,6 +762,11 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
             f"{longest_walking_leg_minutes(option.transit_journey):.1f} min",
             _transit_summary(option.transit_journey.legs),
             option.arrival.strftime("%H:%M"),
+            (
+                option.reliability.confidence.value
+                if option.reliability is not None
+                else "unknown"
+            ),
             f"{option.score.total_minutes:.1f}",
             str(len(option.matched_disruptions)),
         )
@@ -806,6 +818,7 @@ def _render_return_plan(plan: ReturnPlan) -> None:
         "Walk total/max",
         "Bike home",
         "Home",
+        "Confidence",
         "Score",
         "Alerts",
     )
@@ -818,6 +831,11 @@ def _render_return_plan(plan: ReturnPlan) -> None:
             f"{option.bike_route.duration_seconds / 60:.0f} min "
             f"({option.bike_route.title})",
             option.arrival.strftime("%H:%M"),
+            (
+                option.reliability.confidence.value
+                if option.reliability is not None
+                else "unknown"
+            ),
             f"{option.score.total_minutes:.1f}",
             str(len(option.matched_disruptions)),
         )
@@ -844,6 +862,7 @@ def _render_return_plan(plan: ReturnPlan) -> None:
             f"Bike starts at {bike_start:%H:%M} from exact station "
             f"{option.station.name} ({option.station.id})"
         )
+        _render_reliability(option.reliability)
         console.print(f"Score: {option.score.total_minutes:.1f}")
     if plan.rejections:
         console.print(f"[yellow]{len(plan.rejections)} route(s) rejected.[/yellow]")
@@ -881,6 +900,7 @@ def _render_option_details(
             f"Transit response generated: "
             f"{journey.response_timestamp:%Y-%m-%d %H:%M:%S %Z}"
         )
+    _render_reliability(option.reliability)
     if option.bike_route is not None:
         _render_bike_details(option)
     _render_transit_legs(journey.legs)
@@ -936,6 +956,23 @@ def _render_bike_details(option: OutboundOption) -> None:
         f"Bike timing: leave {option.departure:%H:%M}, arrive {bike_arrival:%H:%M}, "
         f"park {option.parking_buffer_seconds / 60:g} min, ready {ready_at:%H:%M}{speed}"
     )
+
+
+def _render_reliability(reliability: ReliabilityAssessment | None) -> None:
+    if reliability is None:
+        console.print("Confidence: unknown")
+        return
+    age = (
+        f"{reliability.data_age_seconds / 60:.1f} min"
+        if reliability.data_age_seconds is not None
+        else "unknown"
+    )
+    console.print(
+        f"Confidence: {reliability.confidence.value} · data age {age} · "
+        f"robust arrival {reliability.robust_arrival:%H:%M}"
+    )
+    for reason in reliability.reasons:
+        console.print(f"  - {reason}")
 
 
 def _bike_quality_parts(route: BikeRoute) -> list[str]:

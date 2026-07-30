@@ -242,6 +242,29 @@ explicit correction or confirmation button writes to the local SQLite file.
 The API token remains in `.env`/the environment and is not displayed. The
 server binds to `127.0.0.1`, so it is not exposed to the local network.
 
+## Reliability assessment
+
+Every outbound and return option now includes a rule-based confidence label,
+provider-response age, reasons, and a robust-arrival safety view:
+
+- `high`: fresh response, all public-transport legs realtime, and no matched
+  material alert;
+- `medium`: aging-but-not-stale data or at least one schedule-only transit leg;
+- `low`: missing/stale response timing or a matched material disruption.
+
+The displayed provider arrival is never overwritten. Robust arrival is shown
+separately and adds the configured explicit safety buffer:
+
+```yaml
+reliability:
+  fresh_age_seconds: 120
+  stale_age_seconds: 300
+  medium_buffer_minutes: 5
+  low_buffer_minutes: 10
+```
+
+This avoids presenting an app-generated buffer as an official realtime ETA.
+
 ## Offline checks
 
 ```bash

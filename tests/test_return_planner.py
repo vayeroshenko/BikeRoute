@@ -129,6 +129,15 @@ async def test_return_forces_transit_to_bicycle_station_then_cycles_home() -> No
     assert len(plan.options) == 1
     assert plan.options[0].arrival == datetime(2026, 7, 30, 19, 2, tzinfo=PARIS)
     assert plan.options[0].station.id == "stop_area:sceaux"
+    assert plan.options[0].reliability is not None
+    assert plan.options[0].reliability.robust_arrival == datetime(
+        2026,
+        7,
+        30,
+        19,
+        12,
+        tzinfo=PARIS,
+    )
     assert [rejection.bike_duration_minutes for rejection in plan.rejections] == [60]
 
 

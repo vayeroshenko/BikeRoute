@@ -21,6 +21,12 @@ class Freshness(StrEnum):
     UNKNOWN = "unknown"
 
 
+class Confidence(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class OutboundOptionKind(StrEnum):
     BIKE_TRANSIT = "bike_transit"
     ALL_TRANSIT = "all_transit"
@@ -223,6 +229,21 @@ class ScoreBreakdown(DomainModel):
     total_minutes: float = Field(ge=0)
 
 
+class ReliabilityAssessment(DomainModel):
+    confidence: Confidence
+    data_age_seconds: float | None = Field(default=None, ge=0)
+    robust_arrival: AwareDatetime
+    safety_buffer_minutes: float = Field(ge=0)
+    realtime_leg_count: int = Field(ge=0)
+    scheduled_leg_count: int = Field(ge=0)
+    reasons: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_robust_arrival(self) -> ReliabilityAssessment:
+        _require_aware(self.robust_arrival, "robust_arrival")
+        return self
+
+
 class OutboundOption(DomainModel):
     kind: OutboundOptionKind
     station: Station | None = None
@@ -232,6 +253,7 @@ class OutboundOption(DomainModel):
     arrival: AwareDatetime
     parking_buffer_seconds: int = Field(default=0, ge=0)
     matched_disruptions: tuple[Disruption, ...] = ()
+    reliability: ReliabilityAssessment | None = None
     score: ScoreBreakdown
 
     @model_validator(mode="after")

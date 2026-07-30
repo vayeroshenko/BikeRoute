@@ -11,12 +11,14 @@ from idf_commute.domain.models import (
     DomainModel,
     Location,
     OutboundOption,
+    ReliabilityAssessment,
     ScoreBreakdown,
     Station,
     TransitJourney,
     _require_aware,
 )
 from idf_commute.domain.state import BikeLocation, BikeState
+from idf_commute.planning.reliability import ReliabilityPolicy
 from idf_commute.planning.scoring import ScoreMode, ScoreWeights
 
 
@@ -37,6 +39,7 @@ class OutboundPlanningRequest(DomainModel):
     max_results: int = Field(default=5, ge=1, le=20)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
+    reliability_policy: ReliabilityPolicy = Field(default_factory=ReliabilityPolicy)
     bike_state: BikeState = Field(
         default_factory=lambda: BikeState(location=BikeLocation.HOME)
     )
@@ -111,6 +114,7 @@ class ReturnPlanningRequest(DomainModel):
     max_results: int = Field(default=5, ge=1, le=20)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
+    reliability_policy: ReliabilityPolicy = Field(default_factory=ReliabilityPolicy)
 
     @model_validator(mode="after")
     def validate_request(self) -> ReturnPlanningRequest:
@@ -134,6 +138,7 @@ class ReturnOption(DomainModel):
     arrival: AwareDatetime
     retrieval_buffer_seconds: int = Field(default=0, ge=0)
     matched_disruptions: tuple[Disruption, ...] = ()
+    reliability: ReliabilityAssessment | None = None
     score: ScoreBreakdown
 
     @model_validator(mode="after")

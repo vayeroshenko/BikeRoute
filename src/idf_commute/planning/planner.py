@@ -28,6 +28,7 @@ from idf_commute.planning.models import (
     ReturnPlanningRequest,
     planning_horizon_end,
 )
+from idf_commute.planning.reliability import assess_reliability
 from idf_commute.planning.scoring import score_outbound
 from idf_commute.providers.protocols import (
     BikeRouter,
@@ -279,6 +280,12 @@ class OutboundPlanner:
             arrival=journey.arrival,
             parking_buffer_seconds=round(request.parking_buffer_minutes * 60),
             matched_disruptions=matched,
+            reliability=assess_reliability(
+                journey,
+                arrival=journey.arrival,
+                disruptions=matched,
+                policy=request.reliability_policy,
+            ),
             score=score,
         )
 
@@ -305,6 +312,12 @@ class OutboundPlanner:
             departure=request.depart_at,
             arrival=journey.arrival,
             matched_disruptions=matched,
+            reliability=assess_reliability(
+                journey,
+                arrival=journey.arrival,
+                disruptions=matched,
+                policy=request.reliability_policy,
+            ),
             score=score,
         )
 
@@ -459,6 +472,12 @@ class ReturnPlanner:
             arrival=arrival,
             retrieval_buffer_seconds=round(request.retrieval_buffer_minutes * 60),
             matched_disruptions=matched,
+            reliability=assess_reliability(
+                journey,
+                arrival=arrival,
+                disruptions=matched,
+                policy=request.reliability_policy,
+            ),
             score=score,
         )
 
