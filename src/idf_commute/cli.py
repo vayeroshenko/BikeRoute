@@ -35,9 +35,15 @@ from idf_commute.domain.models import (
 )
 from idf_commute.domain.state import BikeLocation, BikeState
 from idf_commute.persistence import BikeStateStore
-from idf_commute.planning.models import OutboundPlan, OutboundPlanningRequest
+from idf_commute.planning.models import (
+    OutboundPlan,
+    OutboundPlanningRequest,
+    ReturnPlan,
+    ReturnPlanningRequest,
+)
 from idf_commute.planning.planner import (
     OutboundPlanner,
+    ReturnPlanner,
     longest_walking_leg_minutes,
     walking_duration_minutes,
 )
@@ -377,6 +383,87 @@ async def _run_outbound_plan(
         )
 
 
+async def _run_return_plan(
+    config_path: Path,
+    depart_at_text: str,
+    max_bike_minutes: float | None,
+    max_walking_minutes: float | None,
+    max_walking_leg_minutes: float | None,
+    max_results: int,
+    score_mode: ScoreMode | None,
+) -> ReturnPlan:
+    config = load_config(config_path)
+    bike_state = _bike_state_store(config_path).load()
+    if bike_state.location is not BikeLocation.STATION or not bike_state.station_id:
+        raise ValueError(
+            "Return planning requires the bicycle to be recorded at a station; "
+            "check with 'idf-commute bike status'"
+        )
+    settings = Settings()
+    departure = _parse_departure(depart_at_text, config.timezone)
+    preferred_minutes, hard_minutes = _effective_bike_thresholds(
+        config.bicycle.preferred_bike_minutes,
+        config.bicycle.max_bike_minutes,
+        max_bike_minutes,
+    )
+    walking_limit = _effective_walking_limit(
+        config.walking.max_minutes,
+        max_walking_minutes,
+    )
+    walking_leg_limit = _effective_walking_leg_limit(
+        config.walking.max_leg_minutes,
+        max_walking_leg_minutes,
+    )
+    active_score_mode = score_mode or config.scoring.mode
+    score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
+    score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
+    async with PrimClient(
+        settings.require_api_key(),
+        api_key_header=settings.api_key_header,
+        timeout_seconds=settings.timeout_seconds,
+    ) as client:
+        navitia = NavitiaAdapter(client, str(settings.navitia_base_url))
+        stations = await _select_bike_stations(
+            config,
+            navitia,
+            bike_state.station_id,
+            hard_minutes,
+        )
+        station = stations[0]
+        planner = ReturnPlanner(
+            bike_router=GeoveloAdapter(client, str(settings.geovelo_url)),
+            transit_router=navitia,
+            disruption_provider=BulkDisruptionAdapter(
+                client,
+                str(settings.disruptions_url),
+            ),
+        )
+        return await planner.plan(
+            ReturnPlanningRequest(
+                work_transit_id=config.locations.work.navitia_coord,
+                home=Location(
+                    latitude=config.locations.home.latitude,
+                    longitude=config.locations.home.longitude,
+                    label="HOME",
+                ),
+                bike_station=station,
+                bike_state=bike_state,
+                depart_at=departure,
+                preferred_bike_minutes=preferred_minutes,
+                max_bike_minutes=hard_minutes,
+                max_walking_minutes=walking_limit,
+                max_walking_leg_minutes=walking_leg_limit,
+                retrieval_buffer_minutes=config.bicycle.parking_buffer_minutes,
+                bike_profile=config.bicycle.profile,
+                bike_type=config.bicycle.bike_type,
+                bike_average_speed_kmh=config.bicycle.average_speed_kmh,
+                max_results=max_results,
+                score_mode=active_score_mode,
+                score_weights=score_weights,
+            )
+        )
+
+
 async def _resolve_candidate_stations(
     candidates: list[CandidateStation],
     places: PlaceProvider,
@@ -651,6 +738,71 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
                 f"{rejection.bike_route_title or 'no bike route'}"
                 f"{bike_duration}{walking_duration}{walking_leg_duration}: "
                 f"{rejection.reason}"
+            )
+
+
+def _render_return_plan(plan: ReturnPlan) -> None:
+    station = plan.bike_state.station_name or plan.bike_state.station_id
+    console.print(f"Retrieving bicycle from: [bold]{station}[/bold]")
+    console.print(
+        f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
+        f"hard maximum {plan.max_bike_minutes:g} min"
+    )
+    console.print(
+        f"Walking limits: {plan.max_walking_minutes:g} min total, "
+        f"{plan.max_walking_leg_minutes:g} min per leg"
+    )
+    table = Table(
+        "Rank",
+        "Transit to bicycle",
+        "Walk total/max",
+        "Bike home",
+        "Home",
+        "Score",
+        "Alerts",
+    )
+    for rank, option in enumerate(plan.options, start=1):
+        table.add_row(
+            str(rank),
+            _transit_summary(option.transit_journey.legs),
+            f"{walking_duration_minutes(option.transit_journey):.1f} / "
+            f"{longest_walking_leg_minutes(option.transit_journey):.1f} min",
+            f"{option.bike_route.duration_seconds / 60:.0f} min "
+            f"({option.bike_route.title})",
+            option.arrival.strftime("%H:%M"),
+            f"{option.score.total_minutes:.1f}",
+            str(len(option.matched_disruptions)),
+        )
+    console.print(table)
+    for rank, option in enumerate(plan.options, start=1):
+        journey = option.transit_journey
+        console.rule(f"#{rank} · retrieve bicycle at {option.station.name}")
+        console.print(
+            f"Door to door: {option.departure:%H:%M} → {option.arrival:%H:%M} "
+            f"({_format_duration(round((option.arrival - option.departure).total_seconds()))})"
+        )
+        _render_transit_legs(journey.legs)
+        bike_start = journey.arrival + timedelta(
+            seconds=option.retrieval_buffer_seconds
+        )
+        console.print(
+            f"Retrieve bicycle: arrive {journey.arrival:%H:%M}, "
+            f"unlock {option.retrieval_buffer_seconds / 60:g} min, "
+            f"ride {option.bike_route.duration_seconds / 60:.0f} min "
+            f"({option.bike_route.distance_m / 1000:.1f} km), "
+            f"home {option.arrival:%H:%M}"
+        )
+        console.print(
+            f"Bike starts at {bike_start:%H:%M} from exact station "
+            f"{option.station.name} ({option.station.id})"
+        )
+        console.print(f"Score: {option.score.total_minutes:.1f}")
+    if plan.rejections:
+        console.print(f"[yellow]{len(plan.rejections)} route(s) rejected.[/yellow]")
+        for rejection in plan.rejections:
+            console.print(
+                f"- {rejection.station_name or rejection.station_id} / "
+                f"{rejection.bike_route_title or 'route'}: {rejection.reason}"
             )
 
 
@@ -965,6 +1117,64 @@ def plan_outbound(
             console.print(
                 f"Confirmed #{confirm_rank}: bicycle recorded at [bold]{station}[/bold]."
             )
+
+
+@plan_app.command("return")
+def plan_return(
+    depart_at: Annotated[
+        str,
+        typer.Option(help="ISO 8601 departure from work, with an offset when possible."),
+    ],
+    config: ConfigPath = Path("config.yaml"),
+    max_bike_minutes: Annotated[
+        float | None,
+        typer.Option(help="Override bicycle hard limit for this run."),
+    ] = None,
+    max_walking_minutes: Annotated[
+        float | None,
+        typer.Option(help="Override total walking hard limit for this run."),
+    ] = None,
+    max_walking_leg_minutes: Annotated[
+        float | None,
+        typer.Option(help="Override maximum duration of any single walking leg."),
+    ] = None,
+    max_results: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            max=20,
+            help="Maximum number of ranked return itineraries to display.",
+        ),
+    ] = 10,
+    score_mode: Annotated[
+        ScoreMode | None,
+        typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
+    ] = None,
+) -> None:
+    """Plan transit to the stored bicycle station, then cycle home."""
+    try:
+        plan = asyncio.run(
+            _run_return_plan(
+                config,
+                depart_at,
+                max_bike_minutes,
+                max_walking_minutes,
+                max_walking_leg_minutes,
+                max_results,
+                score_mode,
+            )
+        )
+    except (
+        FileNotFoundError,
+        ValueError,
+        ValidationError,
+        MissingAccessError,
+        PrimError,
+        sqlite3.Error,
+    ) as exc:
+        console.print(f"[bold red]Return planning stopped:[/bold red] {exc}")
+        raise typer.Exit(code=2) from None
+    _render_return_plan(plan)
 
 
 if __name__ == "__main__":

@@ -119,6 +119,51 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--score-mode" in result.output
 
 
+def test_plan_return_help_is_available() -> None:
+    result = runner.invoke(app, ["plan", "return", "--help"])
+    assert result.exit_code == 0
+    assert "--depart-at" in result.output
+    assert "--max-bike-minutes" in result.output
+    assert "--max-walking-minutes" in result.output
+    assert "--max-walking-leg-mi" in result.output
+    assert "--max-results" in result.output
+    assert "--score-mode" in result.output
+
+
+def test_plan_return_stops_before_api_access_when_bicycle_is_not_at_station(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        """
+locations:
+  home: {latitude: 48.8, longitude: 2.3}
+  work: {latitude: 48.7, longitude: 2.4}
+state:
+  sqlite_path: state/commute.sqlite3
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "plan",
+            "return",
+            "--config",
+            str(config),
+            "--depart-at",
+            "2026-07-30T18:00:00+02:00",
+        ],
+        env={"PRIM_API_KEY": ""},
+    )
+
+    assert result.exit_code == 2
+    assert "requires the bicycle to be recorded at" in result.output
+    assert "a station" in result.output
+    assert "PRIM_API_KEY is missing" not in result.output
+
+
 def test_naive_departure_uses_configured_timezone() -> None:
     parsed = _parse_departure("2026-07-30T08:00", "Europe/Paris")
     assert parsed.tzinfo == ZoneInfo("Europe/Paris")

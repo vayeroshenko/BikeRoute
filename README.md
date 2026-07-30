@@ -190,6 +190,23 @@ source journey ID when available. It refuses a bike route if the current state
 is `station` or `unknown`, so confirmation cannot silently teleport a bicycle.
 Confirming an all-transit option leaves bicycle state unchanged.
 
+## Return planning
+
+When the bicycle is recorded at a station, plan the return from work:
+
+```bash
+idf-commute plan return --config config.yaml \
+  --depart-at 2026-07-30T18:00:00+02:00 \
+  --max-bike-minutes 30
+```
+
+The transit request is forced from work to the exact stored stop-area. The
+planner then adds the retrieval buffer and a Geovelo route from that station
+home. It never substitutes a different bicycle station. Bicycle and walking
+limits, scoring modes, disruption matching, and detailed transit legs remain
+available. This command is read-only for bicycle state; explicit completion is
+implemented separately.
+
 ## Offline checks
 
 ```bash
