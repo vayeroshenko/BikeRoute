@@ -90,6 +90,7 @@ def planning_request() -> OutboundPlanningRequest:
                 id="stop_area:candidate",
                 name="Candidate",
                 location=Location(latitude=48.75, longitude=2.35, label="Candidate"),
+                required_line_id="line:rer-b",
             ),
         ),
         depart_at=datetime(2026, 7, 30, 8, 0, tzinfo=PARIS),
@@ -135,3 +136,48 @@ async def test_disruptions_are_matched_and_scored() -> None:
     ).plan(planning_request())
     assert all(option.matched_disruptions for option in plan.options)
     assert all(option.score.disruption_penalty_minutes == 12 for option in plan.options)
+
+
+class SurfaceFallbackTransitRouter(FakeTransitRouter):
+    async def journeys(self, request: TransitRequest) -> list[TransitJourney]:
+        journeys = await super().journeys(request)
+        if request.origin_id == "stop_area:candidate":
+            journey = journeys[0]
+            return [
+                journey.model_copy(
+                    update={
+                        "legs": (
+                            journey.legs[0].model_copy(
+                                update={
+                                    "line_id": "line:bus-197",
+                                    "line_code": "197",
+                                }
+                            ),
+                            TransitLeg(
+                                type="public_transport",
+                                duration_seconds=10 * 60,
+                                line_id="line:rer-b",
+                            ),
+                        )
+                    }
+                )
+            ]
+        return journeys
+
+
+@pytest.mark.asyncio
+async def test_rejects_surface_fallback_before_required_station_line() -> None:
+    plan = await OutboundPlanner(
+        bike_router=FakeBikeRouter(),
+        transit_router=SurfaceFallbackTransitRouter(),
+        disruption_provider=FakeDisruptions(),
+    ).plan(planning_request())
+
+    assert all(option.kind is OutboundOptionKind.ALL_TRANSIT for option in plan.options)
+    fallback_rejections = [
+        rejection
+        for rejection in plan.rejections
+        if "does not board the required line" in rejection.reason
+    ]
+    assert len(fallback_rejections) == 2
+    assert all("line:bus-197" in rejection.reason for rejection in fallback_rejections)

@@ -233,6 +233,7 @@ async def _resolve_candidate_stations(
             selected.model_copy(
                 update={
                     "name": candidate.label,
+                    "required_line_id": candidate.required_line_id,
                     "location": selected.location.model_copy(update={"label": candidate.label}),
                 }
             )
