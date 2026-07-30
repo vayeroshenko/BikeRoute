@@ -9,6 +9,7 @@ from idf_commute.providers.prim_client import (
     PrimClient,
     PrimEdgeAccessError,
     PrimRateLimitError,
+    PrimRequestBudgetError,
 )
 
 
@@ -55,6 +56,7 @@ async def test_retries_429_honors_retry_after_and_records_metadata() -> None:
     assert sleeps == [2]
     assert response.metadata.response_timestamp == "2026-07-30T09:02:11.434Z"
     assert response.metadata.quota_headers["x-ratelimit-remaining"] == "998"
+    assert client.request_count == 2
 
 
 @pytest.mark.asyncio
@@ -114,3 +116,30 @@ async def test_cache_hook_avoids_second_request() -> None:
     assert first.metadata.from_cache is False
     assert second.metadata.from_cache is True
     assert requests == 1
+    assert client.request_count == 1
+
+
+@pytest.mark.asyncio
+async def test_request_budget_counts_retries_and_stops_before_exceeding_limit() -> None:
+    requests = 0
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(500)
+
+    async def sleep(_: float) -> None:
+        return None
+
+    async with PrimClient(
+        "secret",
+        max_attempts=3,
+        max_requests=2,
+        transport=httpx.MockTransport(handler),
+        sleep=sleep,
+    ) as client:
+        with pytest.raises(PrimRequestBudgetError, match="budget of 2 exhausted"):
+            await client.get_json("https://api.test/retrying")
+
+    assert requests == 2
+    assert client.request_count == 2

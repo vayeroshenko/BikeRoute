@@ -81,6 +81,8 @@ class OutboundPlan(DomainModel):
     max_walking_minutes: float = Field(default=30, gt=0)
     max_walking_leg_minutes: float = Field(default=20, gt=0)
     candidate_station_count: int = Field(default=0, ge=0)
+    api_requests: int = Field(default=0, ge=0)
+    api_request_limit: int | None = Field(default=None, ge=1)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
     bike_state: BikeState = Field(
@@ -157,6 +159,8 @@ class ReturnPlan(DomainModel):
     max_bike_minutes: float = Field(gt=0)
     max_walking_minutes: float = Field(default=30, gt=0)
     max_walking_leg_minutes: float = Field(default=20, gt=0)
+    api_requests: int = Field(default=0, ge=0)
+    api_request_limit: int | None = Field(default=None, ge=1)
     score_mode: ScoreMode = ScoreMode.BALANCED
     score_weights: ScoreWeights = Field(default_factory=ScoreWeights)
     options: tuple[ReturnOption, ...]

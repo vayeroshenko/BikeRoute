@@ -116,6 +116,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--bike-station" in result.output
     assert "--bike-station-range" in result.output
     assert "--confirm-rank" in result.output
+    assert "--max-api-requests" in result.output
     assert "--score-mode" in result.output
 
 
@@ -128,6 +129,7 @@ def test_plan_return_help_is_available() -> None:
     assert "--max-walking-leg-mi" in result.output
     assert "--max-results" in result.output
     assert "--confirm-rank" in result.output
+    assert "--max-api-requests" in result.output
     assert "--score-mode" in result.output
 
 

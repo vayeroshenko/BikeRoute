@@ -270,6 +270,12 @@ subtracting required non-waiting transfer sections. Shortfalls below
 `minimum_connection_minutes` lower confidence and add a visible score
 component; the `reliable` and `fewest-transfers` modes weight it most strongly.
 
+Every planning run also has a hard PRIM HTTP-attempt budget. The default is
+configured under `reliability.max_requests_per_plan` and can be overridden with
+`--max-api-requests`. Retries count because they consume provider quota; cache
+hits do not. Successful plans show `used / allowed`, while an exhausted budget
+stops with a specific error before another provider request is sent.
+
 ## Offline checks
 
 ```bash

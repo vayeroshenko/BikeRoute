@@ -360,6 +360,7 @@ async def _run_outbound_plan(
     bike_station: str | None,
     bike_station_ranges: list[str] | None,
     score_mode: ScoreMode | None,
+    max_api_requests: int | None = None,
 ) -> OutboundPlan:
     config = load_config(config_path)
     settings = Settings()
@@ -381,11 +382,16 @@ async def _run_outbound_plan(
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
     reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
+    request_limit = _effective_api_request_limit(
+        config.reliability.max_requests_per_plan,
+        max_api_requests,
+    )
     bike_state = _bike_state_store(config_path).load()
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
         timeout_seconds=settings.timeout_seconds,
+        max_requests=request_limit,
     ) as client:
         navitia = NavitiaAdapter(client, str(settings.navitia_base_url))
         stations = (
@@ -407,7 +413,7 @@ async def _run_outbound_plan(
                 str(settings.disruptions_url),
             ),
         )
-        return await planner.plan(
+        plan = await planner.plan(
             OutboundPlanningRequest(
                 home=Location(
                     latitude=config.locations.home.latitude,
@@ -433,6 +439,12 @@ async def _run_outbound_plan(
                 bike_state=bike_state,
             )
         )
+        return plan.model_copy(
+            update={
+                "api_requests": client.request_count,
+                "api_request_limit": client.max_requests,
+            }
+        )
 
 
 async def _run_return_plan(
@@ -443,6 +455,7 @@ async def _run_return_plan(
     max_walking_leg_minutes: float | None,
     max_results: int,
     score_mode: ScoreMode | None,
+    max_api_requests: int | None = None,
 ) -> ReturnPlan:
     config = load_config(config_path)
     bike_state = _bike_state_store(config_path).load()
@@ -470,10 +483,15 @@ async def _run_return_plan(
     score_weight_overrides = config.scoring.weights.model_dump(exclude_none=True)
     score_weights = weights_for_mode(active_score_mode, score_weight_overrides)
     reliability_policy = ReliabilityPolicy(**config.reliability.model_dump())
+    request_limit = _effective_api_request_limit(
+        config.reliability.max_requests_per_plan,
+        max_api_requests,
+    )
     async with PrimClient(
         settings.require_api_key(),
         api_key_header=settings.api_key_header,
         timeout_seconds=settings.timeout_seconds,
+        max_requests=request_limit,
     ) as client:
         navitia = NavitiaAdapter(client, str(settings.navitia_base_url))
         stations = await _select_bike_stations(
@@ -491,7 +509,7 @@ async def _run_return_plan(
                 str(settings.disruptions_url),
             ),
         )
-        return await planner.plan(
+        plan = await planner.plan(
             ReturnPlanningRequest(
                 work_transit_id=config.locations.work.navitia_coord,
                 home=Location(
@@ -515,6 +533,12 @@ async def _run_return_plan(
                 score_weights=score_weights,
                 reliability_policy=reliability_policy,
             )
+        )
+        return plan.model_copy(
+            update={
+                "api_requests": client.request_count,
+                "api_request_limit": client.max_requests,
+            }
         )
 
 
@@ -710,6 +734,16 @@ def _effective_walking_leg_limit(
     return maximum
 
 
+def _effective_api_request_limit(
+    configured_maximum: int,
+    override_maximum: int | None,
+) -> int:
+    maximum = configured_maximum if override_maximum is None else override_maximum
+    if maximum <= 0:
+        raise ValueError("--max-api-requests must be greater than zero")
+    return maximum
+
+
 def _render_outbound_plan(plan: OutboundPlan) -> None:
     if plan.bike_state.location is not BikeLocation.HOME:
         location = (
@@ -727,6 +761,9 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
         f"hard maximum {plan.max_bike_minutes:g} min"
     )
     console.print(f"Bike stations evaluated: {plan.candidate_station_count}")
+    console.print(
+        f"PRIM requests: {plan.api_requests} / {plan.api_request_limit or 'unlimited'}"
+    )
     console.print(f"Walking hard maximum: {plan.max_walking_minutes:g} min")
     console.print(
         f"Walking-leg hard maximum: {plan.max_walking_leg_minutes:g} min"
@@ -804,6 +841,9 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
 def _render_return_plan(plan: ReturnPlan) -> None:
     station = plan.bike_state.station_name or plan.bike_state.station_id
     console.print(f"Retrieving bicycle from: [bold]{station}[/bold]")
+    console.print(
+        f"PRIM requests: {plan.api_requests} / {plan.api_request_limit or 'unlimited'}"
+    )
     console.print(
         f"Bike thresholds: preferred {plan.preferred_bike_minutes:g} min, "
         f"hard maximum {plan.max_bike_minutes:g} min"
@@ -1162,6 +1202,14 @@ def plan_outbound(
             ),
         ),
     ] = None,
+    max_api_requests: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            max=200,
+            help="Override the hard PRIM HTTP-attempt budget for this run.",
+        ),
+    ] = None,
     score_mode: Annotated[
         ScoreMode | None,
         typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
@@ -1180,6 +1228,7 @@ def plan_outbound(
                 bike_station,
                 bike_station_range,
                 score_mode,
+                max_api_requests,
             )
         )
     except (
@@ -1248,6 +1297,14 @@ def plan_return(
             help="Confirm a displayed return rank and record the bicycle at home.",
         ),
     ] = None,
+    max_api_requests: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            max=200,
+            help="Override the hard PRIM HTTP-attempt budget for this run.",
+        ),
+    ] = None,
     score_mode: Annotated[
         ScoreMode | None,
         typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
@@ -1264,6 +1321,7 @@ def plan_return(
                 max_walking_leg_minutes,
                 max_results,
                 score_mode,
+                max_api_requests,
             )
         )
     except (

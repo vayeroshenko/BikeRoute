@@ -32,6 +32,10 @@ class PrimRateLimitError(PrimError):
     """PRIM continued to return 429 after bounded retries."""
 
 
+class PrimRequestBudgetError(PrimError):
+    """A planning run exhausted its configured PRIM request budget."""
+
+
 class PrimResponseError(PrimError):
     """PRIM returned an unexpected status or malformed body."""
 
@@ -69,6 +73,7 @@ class PrimClient:
         api_key_header: str = "apiKey",
         timeout_seconds: float = 20.0,
         max_attempts: int = 3,
+        max_requests: int | None = None,
         cache: JsonCache | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         sleep: Sleep = asyncio.sleep,
@@ -78,7 +83,11 @@ class PrimClient:
             raise PrimAuthenticationError("A non-empty PRIM API key is required")
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
+        if max_requests is not None and max_requests < 1:
+            raise ValueError("max_requests must be at least 1")
         self._max_attempts = max_attempts
+        self._max_requests = max_requests
+        self._request_count = 0
         self._cache = cache
         self._sleep = sleep
         self._client = httpx.AsyncClient(
@@ -95,6 +104,14 @@ class PrimClient:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+    @property
+    def request_count(self) -> int:
+        return self._request_count
+
+    @property
+    def max_requests(self) -> int | None:
+        return self._max_requests
 
     async def get_json(
         self,
@@ -156,6 +173,7 @@ class PrimClient:
 
         last_response: httpx.Response | None = None
         for attempt in range(1, self._max_attempts + 1):
+            self._claim_request()
             started = monotonic()
             try:
                 response = await self._client.request(
@@ -212,6 +230,14 @@ class PrimClient:
 
         status = last_response.status_code if last_response is not None else "unknown"
         raise PrimResponseError(f"PRIM request failed with final status {status}")
+
+    def _claim_request(self) -> None:
+        if self._max_requests is not None and self._request_count >= self._max_requests:
+            raise PrimRequestBudgetError(
+                f"PRIM request budget of {self._max_requests} exhausted "
+                "before the next provider call"
+            )
+        self._request_count += 1
 
     async def _get_cached(self, cache_key: str | None) -> Any | None:
         if self._cache is None or cache_key is None:

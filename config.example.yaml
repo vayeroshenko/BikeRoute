@@ -49,6 +49,7 @@ reliability:
   fresh_age_seconds: 120
   stale_age_seconds: 300
   minimum_connection_minutes: 5
+  max_requests_per_plan: 30
   medium_buffer_minutes: 5
   low_buffer_minutes: 10
 

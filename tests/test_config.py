@@ -49,6 +49,7 @@ scoring:
     assert config.reliability.fresh_age_seconds == 120
     assert config.reliability.stale_age_seconds == 300
     assert config.reliability.minimum_connection_minutes == 5
+    assert config.reliability.max_requests_per_plan == 30
 
 
 def test_missing_api_key_stops_live_access(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -96,6 +96,7 @@ class ReliabilityConfig(BaseModel):
     fresh_age_seconds: float = Field(default=120, gt=0)
     stale_age_seconds: float = Field(default=300, gt=0)
     minimum_connection_minutes: float = Field(default=5, ge=0)
+    max_requests_per_plan: int = Field(default=30, ge=1, le=200)
     medium_buffer_minutes: float = Field(default=5, ge=0)
     low_buffer_minutes: float = Field(default=10, ge=0)
 

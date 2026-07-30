@@ -78,6 +78,7 @@ def main() -> None:
         score_mode,
         station_selection,
         station_ranges,
+        max_api_requests,
     ) = departure
 
     try:
@@ -94,6 +95,7 @@ def main() -> None:
                         station_selection,
                         station_ranges,
                         score_mode,
+                        max_api_requests,
                     )
                 )
             else:
@@ -106,6 +108,7 @@ def main() -> None:
                         max_walking_leg_minutes,
                         max_results,
                         score_mode,
+                        max_api_requests,
                     )
                 )
     except Exception as exc:
@@ -129,6 +132,7 @@ def _planning_controls(
         ScoreMode,
         str | None,
         list[str] | None,
+        int,
     ]
     | None
 ):
@@ -191,6 +195,15 @@ def _planning_controls(
             station_selection, station_ranges = _outbound_station_controls()
         else:
             st.caption("The return destination is locked to the station in bicycle state.")
+        max_api_requests = int(
+            st.number_input(
+                "PRIM request budget",
+                min_value=1,
+                max_value=200,
+                value=config.reliability.max_requests_per_plan,
+                help="Counts real HTTP attempts, including retries. Cache hits do not count.",
+            )
+        )
         submitted = st.form_submit_button(
             "Plan current journey",
             type="primary",
@@ -215,6 +228,7 @@ def _planning_controls(
         score_mode,
         station_selection,
         station_ranges,
+        max_api_requests,
     )
 
 
@@ -294,6 +308,10 @@ def _render_saved_plan(config_path: Path, direction: str) -> None:
 
 def _render_outbound(plan: OutboundPlan, config_path: Path) -> None:
     st.subheader("Outbound comparison")
+    st.caption(
+        f"PRIM requests used: {plan.api_requests} / "
+        f"{plan.api_request_limit or 'unlimited'}"
+    )
     if plan.bike_state.location is not BikeLocation.HOME:
         location = (
             plan.bike_state.station_name
@@ -339,6 +357,10 @@ def _render_outbound(plan: OutboundPlan, config_path: Path) -> None:
 def _render_return(plan: ReturnPlan, config_path: Path) -> None:
     station = plan.bike_state.station_name or plan.bike_state.station_id
     st.subheader(f"Return via {station}")
+    st.caption(
+        f"PRIM requests used: {plan.api_requests} / "
+        f"{plan.api_request_limit or 'unlimited'}"
+    )
     st.dataframe(return_summary_rows(plan), hide_index=True, use_container_width=True)
     for rank, option in enumerate(plan.options, start=1):
         with st.expander(
