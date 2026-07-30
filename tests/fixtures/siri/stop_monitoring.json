@@ -1,0 +1,24 @@
+{
+  "Siri": {
+    "ServiceDelivery": {
+      "ResponseTimestamp": "2026-07-30T07:45:00+02:00",
+      "StopMonitoringDelivery": [
+        {
+          "MonitoredStopVisit": [
+            {
+              "MonitoredVehicleJourney": {
+                "LineRef": {"value": "line:IDFM:synthetic"},
+                "MonitoredCall": {
+                  "ExpectedDepartureTime": "2026-07-30T07:50:00+02:00",
+                  "StopPointRef": {"value": "stop_point:IDFM:synthetic"}
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "_fixture_notice": "Synthetic, sanitized contract shape; not a live PRIM observation."
+}
+

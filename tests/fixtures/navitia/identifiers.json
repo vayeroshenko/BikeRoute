@@ -1,0 +1,13 @@
+{
+  "_fixture_notice": "Live PRIM identifiers resolved 2026-07-30. Replacement RER B lines are preserved separately.",
+  "queries": {
+    "4602": [{"code": "4602", "id": "line:IDFM:C01697", "name": "4602"}],
+    "4621": [{"code": "4621", "id": "line:IDFM:C01698", "name": "4621"}],
+    "4622": [{"code": "4622", "id": "line:IDFM:C01699", "name": "4622"}],
+    "RER B": [
+      {"code": "B", "id": "line:IDFM:C01743", "name": "B"},
+      {"code": "B", "id": "line:IDFM:C01850", "name": "Remplacement RER B"},
+      {"code": "B", "id": "line:IDFM:C02385", "name": "Remplacement RER B"}
+    ]
+  }
+}

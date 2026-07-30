@@ -1,0 +1,24 @@
+{
+  "_fixture_notice": "Sanitized live excerpt captured 2026-07-30. PRIM returned HTTP 200 but ignored the requested bike/park mode.",
+  "context": {
+    "current_datetime": "20260730T110948",
+    "timezone": "Europe/Paris"
+  },
+  "journeys": [
+    {
+      "duration": 4832,
+      "sections": [
+        {"duration": 241, "mode": "walking", "type": "street_network"},
+        {"data_freshness": "base_schedule", "duration": 2280, "type": "public_transport"},
+        {"duration": 314, "mode": "walking", "type": "transfer"},
+        {"duration": 277, "type": "waiting"},
+        {"data_freshness": "realtime", "duration": 738, "type": "public_transport"},
+        {"duration": 222, "mode": "walking", "type": "transfer"},
+        {"duration": 309, "type": "waiting"},
+        {"data_freshness": "base_schedule", "duration": 360, "type": "public_transport"},
+        {"duration": 91, "mode": "walking", "type": "street_network"}
+      ],
+      "type": "best"
+    }
+  ]
+}

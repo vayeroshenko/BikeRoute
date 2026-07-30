@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "idf-commute-planner"
+version = "0.1.0"
+description = "API discovery tools for an Île-de-France bike and transit commute planner"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.7,<3",
+  "pydantic-settings>=2.2,<3",
+  "PyYAML>=6,<7",
+  "rich>=13.7,<15",
+  "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10,<2",
+  "pytest>=8.2,<9",
+  "pytest-asyncio>=0.23,<1",
+  "respx>=0.21,<1",
+  "ruff>=0.5,<1",
+  "types-PyYAML>=6,<7",
+]
+
+[project.scripts]
+idf-commute = "idf_commute.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/idf_commute"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+extend-exclude = ["ile-de-france-commute-planner-report.md"]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "scripts"]

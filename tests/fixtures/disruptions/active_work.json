@@ -1,0 +1,34 @@
+{
+  "_fixture_notice": "Sanitized excerpt of the live PRIM bulk response captured 2026-07-30; source message shortened.",
+  "disruptions": [
+    {
+      "applicationPeriods": [
+        {"begin": "20260716T180000", "end": "20260814T230000"}
+      ],
+      "cause": "PERTURBATION",
+      "id": "a24514c3-e5bd-4249-a659-904f3d1fc4dd",
+      "lastUpdate": "20260716T173013",
+      "message": "<sanitized source message omitted>",
+      "severity": "PERTURBEE",
+      "title": "Travaux - ligne 6307 - du 13/07 au 14/08/2026"
+    }
+  ],
+  "lastUpdatedDate": "2026-07-30T09:02:11.434Z",
+  "lines": [
+    {
+      "id": "line:IDFM:C00157",
+      "impactedObjects": [
+        {
+          "disruptionIds": ["a24514c3-e5bd-4249-a659-904f3d1fc4dd"],
+          "id": "line:IDFM:C00157",
+          "name": "6307",
+          "type": "line"
+        }
+      ],
+      "mode": "Bus",
+      "name": "6307",
+      "networkId": "network:IDFM:1062",
+      "shortName": "6307"
+    }
+  ]
+}

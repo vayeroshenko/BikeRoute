@@ -1,0 +1,13 @@
+.env
+PRIMtoken.txt
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+data/
+config.yaml
+tests/fixtures/live/

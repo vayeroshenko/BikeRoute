@@ -1,0 +1,24 @@
+{
+  "_fixture_notice": "Sanitized live access result captured 2026-07-30; Cloudflare HTML body omitted.",
+  "request": {
+    "method": "POST",
+    "parameters": {
+      "bikeDetails": {
+        "averageSpeed": 16,
+        "bikeType": "TRADITIONAL",
+        "profile": "MEDIAN"
+      },
+      "elevations": "true",
+      "geometry": "true",
+      "instructions": "true",
+      "single_result": "false",
+      "waypoints": "<redacted-coordinate>"
+    },
+    "path": "/marketplace/computedroutes"
+  },
+  "response": {
+    "content_type": "text/html; charset=UTF-8",
+    "status_code": 403,
+    "summary": "Cloudflare edge block; API subscription status unknown"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "_fixture_notice": "Reviewed live PRIM Geovelo excerpt captured 2026-07-30. Private coordinates, encoded geometry, route IDs, and road names are redacted.",
+  "routes": [
+    {
+      "distances": {
+        "discouragedRoads": 2192,
+        "normalRoads": 4696,
+        "recommendedRoads": 12883,
+        "total": 19771
+      },
+      "duration": 5563,
+      "id": "<redacted-route-id>",
+      "sections": [
+        {
+          "details": {
+            "averageSpeed": 16,
+            "bikeType": "TRADITIONAL",
+            "distances": {
+              "cycleway": 11893,
+              "discouragedRoads": 2192,
+              "footway": 34,
+              "greenway": 98,
+              "lane": 858,
+              "livingstreet": 737,
+              "normalRoads": 4696,
+              "opposite": 0,
+              "pedestrian": 0,
+              "recommendedRoads": 12883,
+              "residential": 2589,
+              "sharebusway": 0,
+              "steps": 0,
+              "total": 19771,
+              "zone30": 0
+            },
+            "elevations": [
+              ["distanceFromStart", "elevation", "geometryIndex"],
+              [0, 67.6, 0],
+              [17, 67.1, 1]
+            ],
+            "instructions": [
+              [
+                "direction",
+                "roadName",
+                "roadLength",
+                "facility",
+                "cyclability",
+                "geometryIndex",
+                "orientation",
+                "cityNames",
+                "duration"
+              ],
+              [
+                "HEAD_ON",
+                "<sanitized-road-name>",
+                23,
+                "RESIDENTIAL",
+                4,
+                0,
+                "SE",
+                "",
+                7
+              ]
+            ],
+            "profile": "MEDIAN",
+            "verticalGain": 271,
+            "verticalLoss": 184
+          },
+          "duration": 5563,
+          "geometry": "<redacted-geometry>",
+          "transportMode": "BIKE"
+        }
+      ],
+      "title": "RECOMMENDED"
+    },
+    {
+      "distances": {
+        "discouragedRoads": 2189,
+        "normalRoads": 3822,
+        "recommendedRoads": 14638,
+        "total": 20649
+      },
+      "duration": 5838,
+      "id": "<redacted-route-id>",
+      "profile": "BEGINNER",
+      "title": "SAFER",
+      "verticalGain": 286
+    },
+    {
+      "distances": {
+        "discouragedRoads": 5068,
+        "normalRoads": 4360,
+        "recommendedRoads": 9956,
+        "total": 19384
+      },
+      "duration": 5317,
+      "id": "<redacted-route-id>",
+      "profile": "EXPERT",
+      "title": "FASTER",
+      "verticalGain": 283
+    }
+  ]
+}

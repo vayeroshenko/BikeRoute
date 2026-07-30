@@ -1,0 +1,38 @@
+{
+  "_fixture_notice": "Sanitized excerpt of a live PRIM response captured 2026-07-30; endpoints and destination details omitted.",
+  "context": {
+    "current_datetime": "20260730T110947",
+    "timezone": "Europe/Paris"
+  },
+  "journeys": [
+    {
+      "arrival_date_time": "20260730T115231",
+      "departure_date_time": "20260730T112351",
+      "duration": 1720,
+      "nb_transfers": 1,
+      "requested_date_time": "20260730T110947",
+      "sections": [
+        {"duration": 0, "mode": "walking", "type": "crow_fly"},
+        {
+          "base_arrival_date_time": "20260730T113609",
+          "base_departure_date_time": "20260730T112351",
+          "data_freshness": "realtime",
+          "duration": 738,
+          "type": "public_transport"
+        },
+        {"duration": 222, "mode": "walking", "type": "transfer"},
+        {"duration": 309, "type": "waiting"},
+        {
+          "base_arrival_date_time": "20260730T115100",
+          "base_departure_date_time": "20260730T114500",
+          "data_freshness": "base_schedule",
+          "duration": 360,
+          "type": "public_transport"
+        },
+        {"duration": 91, "mode": "walking", "type": "street_network"}
+      ],
+      "status": "",
+      "type": "best"
+    }
+  ]
+}

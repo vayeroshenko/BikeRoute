@@ -1,0 +1,30 @@
+timezone: Europe/Paris
+
+locations:
+  home:
+    # Put real values in ignored config.yaml, never in this tracked example.
+    latitude: 0.0
+    longitude: 0.0
+  work:
+    latitude: 0.0
+    longitude: 0.0
+
+candidate_stations:
+  - query: "REPLACE WITH RER B STATION NAME"
+    id: null
+    label: "RER B candidate"
+
+line_queries:
+  - "RER B"
+  - "4602"
+  - "21"
+  - "22"
+
+probe:
+  coverage: fr-idf
+  navitia_datetime: null
+  stop_monitoring_stop_id: null
+  geovelo_profile: MEDIAN
+  geovelo_bike_type: TRADITIONAL
+  geovelo_average_speed_kmh: 16
+
