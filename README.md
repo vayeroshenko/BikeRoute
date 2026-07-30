@@ -170,6 +170,22 @@ idf-commute bike set-unknown --config config.yaml
 An absent database means `unknown`; it does not silently assume the bicycle is
 at home. The `data/` directory remains ignored by Git.
 
+Planning remains read-only unless `--confirm-rank` is supplied. To record that
+you selected a bike route from the displayed comparison, first ensure the
+bicycle is recorded at home, then confirm its rank:
+
+```bash
+idf-commute bike set-home --config config.yaml
+idf-commute plan outbound --config config.yaml \
+  --depart-at 2026-07-30T08:00:00+02:00 --bike-station best \
+  --confirm-rank 3
+```
+
+Confirmation stores the selected station ID, display name, timestamp, and
+source journey ID when available. It refuses a bike route if the current state
+is `station` or `unknown`, so confirmation cannot silently teleport a bicycle.
+Confirming an all-transit option leaves bicycle state unchanged.
+
 ## Offline checks
 
 ```bash

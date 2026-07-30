@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 import idf_commute.cli as cli_module
 from idf_commute.cli import (
+    _confirm_outbound_selection,
     _effective_bike_thresholds,
     _effective_walking_leg_limit,
     _effective_walking_limit,
@@ -33,6 +34,7 @@ from idf_commute.domain.models import (
     TransitJourney,
     TransitLeg,
 )
+from idf_commute.persistence import BikeStateStore
 from idf_commute.planning.models import OutboundPlan
 
 runner = CliRunner()
@@ -112,6 +114,7 @@ def test_plan_outbound_help_is_available() -> None:
     assert "--max-results" in result.output
     assert "--bike-station" in result.output
     assert "--bike-station-range" in result.output
+    assert "--confirm-rank" in result.output
     assert "--score-mode" in result.output
 
 
@@ -219,6 +222,69 @@ def test_walking_limit_override_is_per_run() -> None:
     assert _effective_walking_leg_limit(20, 8) == 8
     with pytest.raises(ValueError, match="greater than zero"):
         _effective_walking_leg_limit(20, 0)
+
+
+def test_outbound_confirmation_only_moves_a_bicycle_from_home(tmp_path: Path) -> None:
+    departure = datetime(2026, 7, 30, 8, 0, tzinfo=ZoneInfo("Europe/Paris"))
+    journey = TransitJourney(
+        id="journey:bike",
+        duration_seconds=30 * 60,
+        departure=departure + timedelta(minutes=20),
+        arrival=departure + timedelta(minutes=50),
+        legs=(),
+    )
+    score = ScoreBreakdown(
+        door_to_door_minutes=50,
+        bike_penalty_minutes=0,
+        transfer_penalty_minutes=0,
+        disruption_penalty_minutes=0,
+        freshness_penalty_minutes=0,
+        cycling_comfort_penalty_minutes=0,
+        total_minutes=50,
+    )
+    bike_option = OutboundOption(
+        kind=OutboundOptionKind.BIKE_TRANSIT,
+        station=Station(id="stop_area:sceaux", name="Sceaux"),
+        bike_route=BikeRoute(
+            title="RECOMMENDED",
+            duration_seconds=20 * 60,
+            distance_m=5000,
+        ),
+        transit_journey=journey,
+        departure=departure,
+        arrival=journey.arrival,
+        score=score,
+    )
+    baseline = OutboundOption(
+        kind=OutboundOptionKind.ALL_TRANSIT,
+        transit_journey=journey,
+        departure=departure,
+        arrival=journey.arrival,
+        score=score,
+    )
+    plan = OutboundPlan(
+        requested_departure=departure,
+        preferred_bike_minutes=20,
+        max_bike_minutes=30,
+        options=(baseline, bike_option),
+    )
+    store = BikeStateStore(tmp_path / "commute.sqlite3")
+
+    with pytest.raises(ValueError, match="contains 2 option"):
+        _confirm_outbound_selection(plan, 3, store)
+    with pytest.raises(ValueError, match="recorded at home"):
+        _confirm_outbound_selection(plan, 2, store)
+    assert store.load().location.value == "unknown"
+
+    home = store.set_home(updated_at=departure)
+    assert _confirm_outbound_selection(plan, 1, store) is None
+    assert store.load() == home
+
+    parked = _confirm_outbound_selection(plan, 2, store)
+    assert parked is not None
+    assert parked.station_id == "stop_area:sceaux"
+    assert parked.station_name == "Sceaux"
+    assert parked.source_journey_id == "journey:bike"
 
 
 def test_plan_output_shows_bike_transit_legs_freshness_and_alerts(

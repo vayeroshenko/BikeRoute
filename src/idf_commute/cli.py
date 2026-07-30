@@ -126,6 +126,33 @@ def _run_bike_state_command(config_path: Path, action: str, **values: str | None
     _render_bike_state(state)
 
 
+def _confirm_outbound_selection(
+    plan: OutboundPlan,
+    rank: int,
+    store: BikeStateStore,
+) -> BikeState | None:
+    if rank < 1 or rank > len(plan.options):
+        raise ValueError(
+            f"Cannot confirm rank {rank}; this plan contains {len(plan.options)} option(s)"
+        )
+    option = plan.options[rank - 1]
+    if option.kind is OutboundOptionKind.ALL_TRANSIT:
+        return None
+    current = store.load()
+    if current.location is not BikeLocation.HOME:
+        raise ValueError(
+            "Cannot confirm a bike outbound route unless the bicycle is recorded "
+            "at home; use 'idf-commute bike set-home' after checking its location"
+        )
+    if option.station is None:
+        raise ValueError("Selected bike route has no station")
+    return store.set_station(
+        option.station.id,
+        station_name=option.station.name,
+        source_journey_id=option.transit_journey.id,
+    )
+
+
 @bike_app.command("status")
 def bike_status(config: ConfigPath = Path("config.yaml")) -> None:
     """Show where the planner currently believes the bicycle is."""
@@ -861,6 +888,17 @@ def plan_outbound(
             )
         ),
     ] = None,
+    confirm_rank: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            max=20,
+            help=(
+                "Confirm a displayed rank after planning. A bike route records "
+                "its station; an all-transit route leaves bicycle state unchanged."
+            ),
+        ),
+    ] = None,
     score_mode: Annotated[
         ScoreMode | None,
         typer.Option(help="Scoring profile; overrides scoring.mode from config.yaml."),
@@ -891,6 +929,25 @@ def plan_outbound(
         console.print(f"[bold red]Planning stopped:[/bold red] {exc}")
         raise typer.Exit(code=2) from None
     _render_outbound_plan(plan)
+    if confirm_rank is not None:
+        try:
+            state = _confirm_outbound_selection(
+                plan,
+                confirm_rank,
+                _bike_state_store(config),
+            )
+        except (FileNotFoundError, ValueError, ValidationError, sqlite3.Error) as exc:
+            console.print(f"[bold red]Route confirmation stopped:[/bold red] {exc}")
+            raise typer.Exit(code=2) from None
+        if state is None:
+            console.print(
+                f"Confirmed #{confirm_rank}: all transit; bicycle state unchanged."
+            )
+        else:
+            station = state.station_name or state.station_id
+            console.print(
+                f"Confirmed #{confirm_rank}: bicycle recorded at [bold]{station}[/bold]."
+            )
 
 
 if __name__ == "__main__":
