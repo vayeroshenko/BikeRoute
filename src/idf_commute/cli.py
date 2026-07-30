@@ -275,9 +275,15 @@ def _render_outbound_plan(plan: OutboundPlan) -> None:
     if plan.rejections:
         console.print(f"[yellow]{len(plan.rejections)} candidate route(s) rejected.[/yellow]")
         for rejection in plan.rejections:
+            duration = (
+                f", {rejection.bike_duration_minutes:.1f} min"
+                if rejection.bike_duration_minutes is not None
+                else ""
+            )
             console.print(
                 f"- {rejection.station_id} / "
-                f"{rejection.bike_route_title or 'no bike route'}: {rejection.reason}"
+                f"{rejection.bike_route_title or 'no bike route'}{duration}: "
+                f"{rejection.reason}"
             )
 
 
