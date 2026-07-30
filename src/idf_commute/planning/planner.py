@@ -118,24 +118,6 @@ class OutboundPlanner:
                     )
                 )
                 continue
-            first_transit_line = _first_public_transport_line(journey)
-            if (
-                station.required_line_id is not None
-                and first_transit_line != station.required_line_id
-            ):
-                proposed = first_transit_line or "no public-transport line"
-                rejections.append(
-                    CandidateRejection(
-                        station_id=station.id,
-                        bike_route_title=route.title,
-                        bike_duration_minutes=route.duration_seconds / 60,
-                        reason=(
-                            "journey does not board the required line at the bike station "
-                            f"(first line: {proposed}; required: {station.required_line_id})"
-                        ),
-                    )
-                )
-                continue
             options.append(
                 self._bike_transit_option(
                     request,
@@ -241,6 +223,7 @@ class OutboundPlanner:
             matched_disruptions=matched,
             score=score,
         )
+
     def _baseline_option(
         self,
         request: OutboundPlanningRequest,
@@ -265,14 +248,3 @@ class OutboundPlanner:
             matched_disruptions=matched,
             score=score,
         )
-
-
-def _first_public_transport_line(journey: TransitJourney) -> str | None:
-    return next(
-        (
-            leg.line_id
-            for leg in journey.legs
-            if leg.type == "public_transport" and leg.line_id is not None
-        ),
-        None,
-    )

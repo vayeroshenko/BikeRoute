@@ -37,7 +37,6 @@ class Station(DomainModel):
     name: str
     location: Location | None = None
     line_ids: tuple[str, ...] = ()
-    required_line_id: str | None = None
 
 
 class TimeInterval(DomainModel):

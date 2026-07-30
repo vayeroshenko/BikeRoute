@@ -86,7 +86,6 @@ async def test_candidate_resolution_prefers_required_line() -> None:
     )
     assert stations[0].id == "stop_area:rer"
     assert stations[0].name == "Bike station"
-    assert stations[0].required_line_id == "line:IDFM:C01743"
 
 
 def test_bike_limit_override_is_per_run_and_can_be_stricter_than_preference() -> None:
